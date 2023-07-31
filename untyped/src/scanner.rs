@@ -7,6 +7,7 @@ lazy_static! {
         m.insert('(', TokenType::LeftParen);
         m.insert(')', TokenType::RightParen);
         m.insert('λ', TokenType::Lambda);
+        m.insert('\\', TokenType::Lambda);
         m
     };
     // leaving this as a reference for later expansion

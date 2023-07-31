@@ -69,6 +69,19 @@ impl Term {
             ),
         )
     }
+
+    pub fn pow() -> Self {
+        abs(
+            "m",
+            abs(
+                "n",
+                app(
+                    app(var("m"), app(Term::times(), var("n"))),
+                    app(Term::succ(), Term::zero()),
+                ),
+            ),
+        )
+    }
 }
 
 impl From<usize> for Term {

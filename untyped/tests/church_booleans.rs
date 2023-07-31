@@ -57,6 +57,12 @@ mod test {
     #[test]
     fn plus() {
         let term = appa(appa(Term::plus().to_anon(), 1.into()), 2.into());
-        assert_eq!(term.full(), <usize as Into<TermAnon>>::into(3_usize));
+        assert_eq!(term.full(), <usize as Into<TermAnon>>::into(3_usize).full());
+    }
+
+    #[test]
+    fn times() {
+        let term = appa(appa(Term::times().to_anon(), 2.into()), 3.into());
+        assert_eq!(term.full(), <usize as Into<TermAnon>>::into(6_usize).full());
     }
 }

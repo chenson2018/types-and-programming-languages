@@ -91,6 +91,6 @@ impl From<usize> for TermAnon {
             term = appa(Term::succ().to_anon(), term);
         }
 
-        term.full()
+        term
     }
 }

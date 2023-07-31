@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 use std::fmt::Display;
+use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
     Var(String),
     Abs(String, Box<Term>),
@@ -13,6 +14,24 @@ pub enum TermAnon {
     Var(usize),
     Abs(Box<TermAnon>),
     App(Box<TermAnon>, Box<TermAnon>),
+}
+
+// this is primarily for testing purposes
+impl FromStr for Term {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut scanner = crate::scanner::Scanner::new(&s);
+        if let Err(e) = scanner.scan() {
+            return Err(e.clone());
+        };
+        let mut parser = crate::parser::Parser::from(&scanner);
+
+        match parser.parse() {
+            Err(e) => Err(e.to_string()),
+            Ok(ast) => Ok(ast),
+        }
+    }
 }
 
 impl Display for TermAnon {

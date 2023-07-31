@@ -6,3 +6,6 @@ pub mod church;
 pub mod parser;
 pub mod scanner;
 pub mod term;
+
+#[macro_use]
+extern crate lazy_static;

@@ -1,6 +1,23 @@
 use crate::term::*;
+use std::collections::HashMap;
 
 impl Term {
+    pub fn env() -> HashMap<Term, Term> {
+        HashMap::from([
+            (var("zero"), Term::zero()),
+            (var("fls"), Term::zero()),
+            (var("tru"), Term::tru()),
+            (var("test"), Term::test()),
+            (var("and"), Term::and()),
+            (var("or"), Term::or()),
+            (var("not"), Term::not()),
+            (var("succ"), Term::succ()),
+            (var("plus"), Term::plus()),
+            (var("times"), Term::times()),
+            (var("pow"), Term::pow()),
+        ])
+    }
+
     pub fn zero() -> Self {
         abs("s", abs("z", var("z")))
     }

@@ -4,6 +4,8 @@ use untyped::term::*;
 use untyped::term::{Term, TermAnon};
 
 fn main() {
-    let t: TermAnon = 3.into();
-    println!("{t}");
+    let term = app(app(Term::times(), 2.into()), 2.into());
+    println!("{term}");
+    println!("{}", term.to_anon());
+    println!("{}", term.full());
 }

@@ -59,6 +59,28 @@ impl Term {
             ),
         )
     }
+
+    pub fn times() -> Self {
+        abs(
+            "m",
+            abs(
+                "n",
+                app(app(var("m"), app(Term::plus(), var("n"))), Term::zero()),
+            ),
+        )
+    }
+}
+
+impl From<usize> for Term {
+    fn from(value: usize) -> Term {
+        let mut term = Term::zero();
+
+        for _ in 0..value {
+            term = app(Term::succ(), term);
+        }
+
+        term
+    }
 }
 
 impl From<usize> for TermAnon {

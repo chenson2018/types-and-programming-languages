@@ -5,6 +5,7 @@ pub enum Type {
     Bool,
     Nat,
     Con(Box<Type>, Box<Type>),
+    List(Box<Type>),
 }
 
 pub fn con(t1: &Type, t2: &Type) -> Type {
@@ -17,6 +18,7 @@ impl Display for Type {
             Type::Bool => write!(f, "𝔹"),
             Type::Nat => write!(f, "ℕ"),
             Type::Con(l, r) => write!(f, "({} → {})", l, r),
+            Type::List(dtype) => write!(f, "List[{}]", dtype),
         }
     }
 }

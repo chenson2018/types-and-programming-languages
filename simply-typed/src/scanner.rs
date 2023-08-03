@@ -15,6 +15,9 @@ lazy_static! {
             ('=', TokenType::Equal),
             (';', TokenType::In),
             ('.', TokenType::Dot),
+            (',', TokenType::Comma),
+            ('[', TokenType::LeftBracket),
+            (']', TokenType::RightBracket),
         ])
     };
     static ref KEYWORDS: HashMap<&'static str, TokenType> = {
@@ -27,6 +30,13 @@ lazy_static! {
             ("else", TokenType::Else),
             ("fix", TokenType::Fix),
             ("let", TokenType::Let),
+            ("nil", TokenType::Nil),
+            ("isnil", TokenType::IsNil),
+            ("cons", TokenType::Cons),
+            ("head", TokenType::Head),
+            ("tail", TokenType::Tail),
+            ("list", TokenType::ListSugar),
+            ("List", TokenType::ListType),
         ])
     };
     static ref TYPES: HashMap<&'static str, (TokenType, Type)> = {
@@ -52,6 +62,17 @@ pub enum TokenType {
     Dot,
     Eof,
 
+    // lists, including sugar
+    IsNil,
+    Nil,
+    Cons,
+    Head,
+    Tail,
+    LeftBracket,
+    RightBracket,
+    Comma,
+    ListSugar,
+
     // if expressions
     If,
     Then,
@@ -66,6 +87,7 @@ pub enum TokenType {
     Pred,
 
     // for types
+    ListType,
     BoolType,
     NatType,
     Colon,

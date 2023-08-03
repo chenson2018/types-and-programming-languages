@@ -69,6 +69,14 @@ impl<'a> Parser<'a> {
         loop {
             match self.advance() {
                 Token {
+                    token: TokenType::ListType,
+                    ..
+                } => {
+                    self.expect(TokenType::LeftBracket)?;
+                    let dtype = self.dtype()?;
+                    types.push(Type::List(box dtype));
+                }
+                Token {
                     dtype: Some(dtype), ..
                 } => types.push(dtype),
                 Token {
@@ -83,7 +91,12 @@ impl<'a> Parser<'a> {
                     ..
                 } => (),
                 Token {
-                    token: TokenType::Dot | TokenType::RightParen,
+                    token:
+                        TokenType::Dot
+                        | TokenType::RightParen
+                        | TokenType::RightBracket
+                        | TokenType::LeftBracket
+                        | TokenType::Equal,
                     ..
                 } => break,
                 Token { token, .. } => return Err(format!("Invalid token {:?} in type", token)),
@@ -121,16 +134,80 @@ impl<'a> Parser<'a> {
     fn primary(&mut self) -> Result<Term, String> {
         match self.advance() {
             Token {
+                token: token @ (TokenType::IsNil | TokenType::Head | TokenType::Tail),
+                ..
+            } => {
+                self.expect(TokenType::LeftBracket)?;
+                let dtype = self.dtype()?;
+                let t1 = self.expr()?;
+
+                let term = match token {
+                    TokenType::IsNil => Term::IsNil(dtype, box t1),
+                    TokenType::Head => Term::Head(dtype, box t1),
+                    TokenType::Tail => Term::Tail(dtype, box t1),
+                    _ => unreachable!(),
+                };
+
+                Ok(term)
+            }
+            // sugar for lists, requires a type annotation
+            Token {
+                token: TokenType::ListSugar,
+                ..
+            } => {
+                self.expect(TokenType::LeftBracket)?;
+                let dtype = self.dtype()?;
+                self.expect(TokenType::LeftBracket)?;
+                let mut terms: Vec<Term> = Vec::new();
+
+                loop {
+                    if self.check(TokenType::RightBracket) {
+                        self.advance();
+                        break;
+                    } else {
+                        terms.push(self.primary()?);
+                        if !self.check(TokenType::RightBracket) {
+                            self.expect(TokenType::Comma)?;
+                        }
+                    }
+                }
+
+                terms = terms.into_iter().rev().collect();
+
+                Ok(terms.iter().fold(Term::Nil(dtype.clone()), |acc, t| {
+                    Term::Cons(dtype.clone(), box t.clone(), box acc)
+                }))
+            }
+            Token {
+                token: TokenType::Nil,
+                ..
+            } => {
+                self.expect(TokenType::LeftBracket)?;
+                let dtype = self.dtype()?;
+                Ok(Term::Nil(dtype))
+            }
+            Token {
+                token: TokenType::Cons,
+                ..
+            } => {
+                self.expect(TokenType::LeftBracket)?;
+                let dtype = self.dtype()?;
+                let t1 = self.primary()?;
+                let t2 = self.primary()?;
+                Ok(Term::Cons(dtype, box t1, box t2))
+            }
+            // TODO make this a term instead of a derived form
+            Token {
                 token: TokenType::Let,
                 ..
             } => {
                 let binding = self.expect(TokenType::Name)?;
-                self.expect(TokenType::Equal)?;
+                self.expect(TokenType::Colon)?;
+                let dtype = self.dtype()?;
                 let e1 = self.expr()?;
                 self.expect(TokenType::In)?;
                 let e2 = self.expr()?;
                 if let Some(Term::Var(name)) = binding.term {
-                    let dtype = e1.dtype()?;
                     Ok(app(abs(name, dtype, e2), e1))
                 } else {
                     Err("let missing binding".into())

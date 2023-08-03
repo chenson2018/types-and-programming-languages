@@ -44,6 +44,17 @@ mod test {
     }
 
     #[test]
+    fn list() {
+        expect_type("list[Nat] [1, 2, 3]", Type::List(Box::new(Type::Nat)));
+        expect_type("isnil[Nat] (list[Nat] [1, 2, 3])", Type::Bool);
+        expect_type("head[Nat] (list[Nat] [1, 2, 3])", Type::Nat);
+        expect_type(
+            "tail[Nat] (list[Nat] [1, 2, 3])",
+            Type::List(Box::new(Type::Nat)),
+        );
+    }
+
+    #[test]
     fn condition_non_bool() {
         expect_err("if 1 then true else false", "non-boolean condition");
     }
@@ -62,5 +73,22 @@ mod test {
     #[test]
     fn iszero_non_nat() {
         expect_err("iszero true", "non-nat iszero")
+    }
+
+    #[test]
+    fn inconsistent_list_typing() {
+        expect_err("list[Nat] [1, true]", "inconsistent list typing");
+        expect_err(
+            "isnil[Bool] (list[Nat] [1, 2, 3])",
+            "inconsistent list typing",
+        );
+        expect_err(
+            "head[Bool] (list[Nat] [1, 2, 3])",
+            "inconsistent list typing",
+        );
+        expect_err(
+            "tail[Bool] (list[Nat] [1, 2, 3])",
+            "inconsistent list typing",
+        );
     }
 }

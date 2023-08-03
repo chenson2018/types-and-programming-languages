@@ -16,6 +16,11 @@ pub enum Term {
     Pred(Box<Term>),
     IsZero(Box<Term>),
     Fix(Box<Term>),
+    Nil(Type),
+    Cons(Type, Box<Term>, Box<Term>),
+    IsNil(Type, Box<Term>),
+    Head(Type, Box<Term>),
+    Tail(Type, Box<Term>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -31,6 +36,11 @@ pub enum TermAnon {
     Pred(Box<TermAnon>),
     IsZero(Box<TermAnon>),
     Fix(Box<TermAnon>),
+    Nil,
+    Cons(Box<TermAnon>, Box<TermAnon>),
+    IsNil(Box<TermAnon>),
+    Head(Box<TermAnon>),
+    Tail(Box<TermAnon>),
 }
 
 impl From<usize> for Term {
@@ -129,20 +139,42 @@ impl Display for TermAnon {
             _ if self == &Term::and().to_anon() => write!(f, "and"),
             _ if self == &Term::not().to_anon() => write!(f, "not"),
             _ if self == &Term::or().to_anon() => write!(f, "or"),
-            TermAnon::Var(name) => write!(f, "{}", name),
-            TermAnon::App(left, right) => write!(f, "({} {})", left, right),
-            TermAnon::Abs(body) => write!(f, "(λ. {})", body),
-            TermAnon::False => write!(f, "false"),
-            TermAnon::True => write!(f, "true"),
-            TermAnon::Zero => write!(f, "nat_0"),
-            TermAnon::Succ(term) => match usize::try_from(self) {
+            Self::Var(name) => write!(f, "{}", name),
+            Self::App(left, right) => write!(f, "({} {})", left, right),
+            Self::Abs(body) => write!(f, "(λ. {})", body),
+            Self::False => write!(f, "false"),
+            Self::True => write!(f, "true"),
+            Self::Zero => write!(f, "nat_0"),
+            Self::Succ(term) => match usize::try_from(self) {
                 Ok(i) => write!(f, "nat_{i}"),
                 Err(_) => write!(f, "succ({})", term),
             },
-            TermAnon::If(cond, consq, alt) => write!(f, "if {cond} then {consq} else {alt}"),
-            TermAnon::Pred(term) => write!(f, "pred({term})"),
-            TermAnon::IsZero(term) => write!(f, "iszero({term})"),
-            TermAnon::Fix(term) => write!(f, "fix({term})"),
+            Self::If(cond, consq, alt) => write!(f, "if {cond} then {consq} else {alt}"),
+            Self::Pred(term) => write!(f, "pred({term})"),
+            Self::IsZero(term) => write!(f, "iszero({term})"),
+            Self::Fix(term) => write!(f, "fix({term})"),
+            Self::Cons(..) => {
+                write!(f, "[")?;
+                let mut term = self.clone();
+                loop {
+                    match term {
+                        TermAnon::Cons(t1, box TermAnon::Nil) => {
+                            write!(f, "{}", t1)?;
+                            break;
+                        }
+                        TermAnon::Cons(t1, t2) => {
+                            write!(f, "{}, ", t1)?;
+                            term = *t2;
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                write!(f, "]")
+            }
+            Self::Nil => write!(f, "[]"),
+            Self::IsNil(t1) => write!(f, "isnil({t1})"),
+            Self::Head(t1) => write!(f, "head({t1})"),
+            Self::Tail(t1) => write!(f, "tail({t1})"),
         }
     }
 }
@@ -154,20 +186,42 @@ impl Display for Term {
             _ if self.to_anon() == Term::and().to_anon() => write!(f, "and"),
             _ if self.to_anon() == Term::not().to_anon() => write!(f, "not"),
             _ if self.to_anon() == Term::or().to_anon() => write!(f, "or"),
-            Term::Var(name) => write!(f, "{}", name),
-            Term::App(left, right) => write!(f, "({} {})", left, right),
-            Term::Abs(name, dtype, body) => write!(f, "(λ{}:{} . {})", name, dtype, body),
-            Term::False => write!(f, "false"),
-            Term::True => write!(f, "true"),
-            Term::Zero => write!(f, "nat_0"),
-            Term::Succ(term) => match usize::try_from(self) {
+            Self::Var(name) => write!(f, "{}", name),
+            Self::App(left, right) => write!(f, "({} {})", left, right),
+            Self::Abs(name, dtype, body) => write!(f, "(λ{}:{} . {})", name, dtype, body),
+            Self::False => write!(f, "false"),
+            Self::True => write!(f, "true"),
+            Self::Zero => write!(f, "nat_0"),
+            Self::Succ(term) => match usize::try_from(self) {
                 Ok(i) => write!(f, "nat_{i}"),
                 Err(_) => write!(f, "succ({})", term),
             },
-            Term::If(cond, consq, alt) => write!(f, "if {cond} then {consq} else {alt}"),
-            Term::Pred(term) => write!(f, "pred({term})"),
-            Term::IsZero(term) => write!(f, "iszero({term})"),
-            Term::Fix(term) => write!(f, "fix({term})"),
+            Self::If(cond, consq, alt) => write!(f, "if {cond} then {consq} else {alt}"),
+            Self::Pred(term) => write!(f, "pred({term})"),
+            Self::IsZero(term) => write!(f, "iszero({term})"),
+            Self::Fix(term) => write!(f, "fix({term})"),
+            Self::Cons(..) => {
+                write!(f, "[")?;
+                let mut term = self.clone();
+                loop {
+                    match term {
+                        Term::Cons(_, t1, box Term::Nil(_)) => {
+                            write!(f, "{}", t1)?;
+                            break;
+                        }
+                        Term::Cons(_, t1, t2) => {
+                            write!(f, "{}, ", t1)?;
+                            term = *t2;
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                write!(f, "]")
+            }
+            Self::Nil(_) => write!(f, "[]"),
+            Self::IsNil(_, t1) => write!(f, "isnil({t1})"),
+            Self::Head(_, t1) => write!(f, "head({t1})"),
+            Self::Tail(_, t1) => write!(f, "tail({t1})"),
         }
     }
 }
@@ -233,7 +287,11 @@ impl TermAnon {
             Self::Succ(t1) => Self::Succ(box t1.shift_cutoff(c, d)),
             Self::Pred(t1) => Self::Pred(box t1.shift_cutoff(c, d)),
             Self::IsZero(t1) => Self::IsZero(box t1.shift_cutoff(c, d)),
-            TermAnon::False | TermAnon::True | TermAnon::Zero => self.clone(),
+            TermAnon::False | TermAnon::True | TermAnon::Zero | TermAnon::Nil => self.clone(),
+            TermAnon::Cons(t1, t2) => {
+                TermAnon::Cons(box t1.shift_cutoff(c, d), box t2.shift_cutoff(c, d))
+            }
+            _ => todo!(),
         }
     }
 
@@ -255,7 +313,9 @@ impl TermAnon {
             Self::If(cond, consq, alt) => {
                 Self::If(box cond.sub(j, s), box consq.sub(j, s), box alt.sub(j, s))
             }
-            TermAnon::False | TermAnon::True | TermAnon::Zero => self.clone(),
+            TermAnon::False | TermAnon::True | TermAnon::Zero | TermAnon::Nil => self.clone(),
+            TermAnon::Cons(t1, t2) => TermAnon::Cons(box t1.sub(j, s), box t2.sub(j, s)),
+            _ => todo!(),
         }
     }
 
@@ -294,6 +354,17 @@ impl TermAnon {
                     _ => Self::IsZero(box t1_eval),
                 }
             }
+            Self::Cons(t1, t2) => Self::Cons(box t1.full(), box t2.full()),
+            Self::IsNil(t1) => {
+                let t1_eval = t1.full();
+                match t1_eval {
+                    TermAnon::Nil => TermAnon::True,
+                    TermAnon::Cons(..) => TermAnon::False,
+                    _ => TermAnon::IsNil(box t1_eval),
+                }
+            }
+            Self::Head(box Self::Cons(box head, _)) => head.full(),
+            Self::Tail(box Self::Cons(_, box tail)) => tail.full(),
             _ => self.clone(),
         }
     }
@@ -360,6 +431,41 @@ impl Term {
                     _ => Err("non-arrow fix"),
                 }
             }
+            Term::Nil(dtype) => Ok(Type::List(box dtype.clone())),
+            Term::Cons(dtype, t1, t2) => {
+                let t1_type = t1.dtype_priv(&ctx)?;
+                let t2_type = t2.dtype_priv(&ctx)?;
+                if &t1_type == dtype && t2_type == Type::List(box dtype.clone()) {
+                    Ok(Type::List(box dtype.clone()))
+                } else {
+                    Err("inconsistent list typing")
+                }
+            }
+            Term::IsNil(dtype, t1) => {
+                let t1_type = t1.dtype_priv(&ctx)?;
+                if Type::List(box dtype.clone()) == t1_type {
+                    Ok(Type::Bool)
+                } else {
+                    Err("inconsistent list typing")
+                }
+            }
+            Term::Head(dtype, t1) => {
+                let t1_type = t1.dtype()?;
+                if Type::List(box dtype.clone()) == t1_type {
+                    Ok(dtype.clone())
+                } else {
+                    Err("inconsistent list typing")
+                }
+            }
+            Term::Tail(dtype, t1) => {
+                let t1_type = t1.dtype()?;
+                let tail_type = Type::List(box dtype.clone());
+                if tail_type == t1_type {
+                    Ok(tail_type)
+                } else {
+                    Err("inconsistent list typing")
+                }
+            }
         }
     }
 
@@ -389,6 +495,13 @@ impl Term {
             Term::True => TermAnon::True,
             Term::False => TermAnon::False,
             Term::Zero => TermAnon::Zero,
+            Term::Nil(_) => TermAnon::Nil,
+            Term::Cons(_, t1, t2) => {
+                TermAnon::Cons(box t1.remove_names(ctx), box t2.remove_names(ctx))
+            }
+            Term::IsNil(_, t1) => TermAnon::IsNil(box t1.remove_names(ctx)),
+            Term::Head(_, t1) => TermAnon::Head(box t1.remove_names(ctx)),
+            Term::Tail(_, t1) => TermAnon::Tail(box t1.remove_names(ctx)),
         }
     }
 
@@ -409,21 +522,24 @@ impl Term {
             Term::Var(name) => {
                 h.insert(name.into());
             }
-            Term::Abs(_, _, body) => body.extract_vars(h),
-            Term::App(t1, t2) => {
-                t1.extract_vars(h);
-                t2.extract_vars(h);
-            }
-            Term::Succ(t1) => t1.extract_vars(h),
-            Term::IsZero(t1) => t1.extract_vars(h),
-            Term::Fix(t1) => t1.extract_vars(h),
-            Term::Pred(t1) => t1.extract_vars(h),
             Term::If(cond, consq, alt) => {
                 cond.extract_vars(h);
                 consq.extract_vars(h);
                 alt.extract_vars(h);
             }
-            Term::False | Term::True | Term::Zero => (),
+            Term::App(t1, t2) | Term::Cons(_, t1, t2) => {
+                t1.extract_vars(h);
+                t2.extract_vars(h);
+            }
+            Term::Abs(_, _, t1)
+            | Term::Succ(t1)
+            | Term::IsZero(t1)
+            | Term::Fix(t1)
+            | Term::Pred(t1)
+            | Term::IsNil(_, t1)
+            | Term::Head(_, t1)
+            | Term::Tail(_, t1) => t1.extract_vars(h),
+            Term::False | Term::True | Term::Zero | Term::Nil(_) => (),
         }
     }
 

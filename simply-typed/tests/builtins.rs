@@ -55,4 +55,12 @@ mod test {
     fn pow() {
         expect_lambda("pow 2 3", "9");
     }
+
+    #[test]
+    fn fact() {
+        expect_lambda("fact 5", "120");
+        expect_lambda("fact 4", "24");
+        expect_lambda("fact 1", "1");
+        expect_lambda("fact 0", "1");
+    }
 }

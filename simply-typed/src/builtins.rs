@@ -11,6 +11,7 @@ lazy_static! {
             (var("plus"), Term::plus()),
             (var("times"), Term::times()),
             (var("pow"), Term::pow()),
+            (var("fact"), Term::fact()),
         ])
     };
 }
@@ -122,6 +123,28 @@ impl Term {
                                 app(app(var("f"), Term::Pred(box var("n"))), var("m")),
                             ),
                         ),
+                    ),
+                ),
+            ),
+        ))
+    }
+
+    pub fn fact() -> Self {
+        Term::Fix(box abs(
+            "f",
+            con(&Type::Nat, &Type::Nat),
+            abs(
+                "n",
+                Type::Nat,
+                Term::If(
+                    box app(
+                        app(Term::or(), Term::IsZero(box var("n"))),
+                        Term::IsZero(box Term::Pred(box var("n"))),
+                    ),
+                    box Term::Succ(box Term::Zero),
+                    box app(
+                        app(Term::times(), var("n")),
+                        app(var("f"), Term::Pred(box var("n"))),
                     ),
                 ),
             ),

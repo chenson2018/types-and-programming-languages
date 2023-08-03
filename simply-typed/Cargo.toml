@@ -1,0 +1,18 @@
+[package]
+name = "simply_typed"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "simply_typed"
+path = "src/lib.rs"
+
+[[bin]]
+name = "simply_typed"
+path = "src/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lazy_static = "1.4.0"
+clap = { version = "4.3.10", features = ["derive"] }

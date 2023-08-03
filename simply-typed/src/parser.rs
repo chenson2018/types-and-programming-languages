@@ -124,18 +124,17 @@ impl<'a> Parser<'a> {
                 token: TokenType::Let,
                 ..
             } => {
-                // TODO placeholder for let expressions
-                todo!()
-                //                let binding = self.expect(TokenType::Name)?;
-                //                self.expect(TokenType::Equal)?;
-                //                let e1 = self.expr()?;
-                //                self.expect(TokenType::In)?;
-                //                let e2 = self.expr()?;
-                //                if let Some(Term::Var(name)) = binding.term {
-                //                    Ok(Term::Let(name, box e1, box e2))
-                //                } else {
-                //                    Err("let missing binding".into())
-                //                }
+                let binding = self.expect(TokenType::Name)?;
+                self.expect(TokenType::Equal)?;
+                let e1 = self.expr()?;
+                self.expect(TokenType::In)?;
+                let e2 = self.expr()?;
+                if let Some(Term::Var(name)) = binding.term {
+                    let dtype = e1.dtype()?;
+                    Ok(app(abs(name, dtype, e2), e1))
+                } else {
+                    Err("let missing binding".into())
+                }
             }
             Token {
                 token: TokenType::Lambda,
@@ -191,7 +190,7 @@ impl<'a> Parser<'a> {
                 ..
             } => {
                 if let Some(builtin) = BUILTINS.get(&term) {
-                    Ok(builtin.clone().expand_builtin())
+                    Ok(builtin.clone())
                 } else {
                     Ok(term)
                 }

@@ -48,7 +48,7 @@ mod test {
 
     #[test]
     fn times() {
-        expect_lambda("times 2 2", "4");
+        expect_lambda("times 12 12", "144");
     }
     //
     //    #[test]

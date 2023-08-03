@@ -50,9 +50,9 @@ mod test {
     fn times() {
         expect_lambda("times 12 12", "144");
     }
-    //
-    //    #[test]
-    //    fn pow() {
-    //        expect_lambda("(pow 2 3)", "(9)");
-    //    }
+
+    #[test]
+    fn pow() {
+        expect_lambda("pow 2 3", "9");
+    }
 }

@@ -156,7 +156,7 @@ impl Scanner {
     }
 
     fn identifier(&mut self) {
-        while self.peek().is_alphabetic() {
+        while self.peek().is_alphanumeric() || self.peek() == '_' {
             self.advance();
         }
 

@@ -10,7 +10,7 @@ lazy_static! {
             (var("not"), Term::not()),
             (var("plus"), Term::plus()),
             (var("times"), Term::times()),
-            //            (var("pow"), Term::pow()),
+            (var("pow"), Term::pow()),
         ])
     };
 }
@@ -92,6 +92,33 @@ impl Term {
                             box var("m"),
                             box app(
                                 app(Term::plus(), var("m")),
+                                app(app(var("f"), Term::Pred(box var("n"))), var("m")),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ))
+    }
+
+    pub fn pow() -> Self {
+        Term::Fix(box abs(
+            "f",
+            con(&Type::Nat, &con(&Type::Nat, &Type::Nat)),
+            abs(
+                "n",
+                Type::Nat,
+                abs(
+                    "m",
+                    Type::Nat,
+                    Term::If(
+                        box Term::IsZero(box var("n")),
+                        box Term::Succ(box Term::Zero),
+                        box Term::If(
+                            box Term::IsZero(box Term::Pred(box var("n"))),
+                            box var("m"),
+                            box app(
+                                app(Term::times(), var("m")),
                                 app(app(var("f"), Term::Pred(box var("n"))), var("m")),
                             ),
                         ),

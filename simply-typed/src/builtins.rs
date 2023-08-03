@@ -167,18 +167,14 @@ impl Term {
                         "y",
                         Type::List(box Type::Nat),
                         Term::If(
-                            box Term::IsNil(Type::Nat, box var("y")),
+                            box Term::IsNil(box var("y")),
                             box var("x"),
                             box app(
                                 app(
                                     var("f"),
-                                    Term::Cons(
-                                        Type::Nat,
-                                        box Term::Head(Type::Nat, box var("y")),
-                                        box var("x"),
-                                    ),
+                                    Term::Cons(box Term::Head(box var("y")), box var("x")),
                                 ),
-                                Term::Tail(Type::Nat, box var("y")),
+                                Term::Tail(box var("y")),
                             ),
                         ),
                     ),

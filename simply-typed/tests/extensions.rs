@@ -14,25 +14,22 @@ mod test {
 
     #[test]
     fn list_sugar() {
-        expect_lambda(
-            "list[Nat] [1, 2, 3]",
-            "cons[Nat] 1 (cons[Nat] 2 (cons[Nat] 3 nil[Nat]))",
-        )
+        expect_lambda("list[Nat] [1, 2, 3]", "cons 1 (cons 2 (cons 3 nil[Nat]))")
     }
 
     #[test]
     fn isnil() {
-        expect_lambda("isnil[Nat] (list[Nat] [])", "true");
-        expect_lambda("isnil[Nat] (list[Nat] [1])", "false");
+        expect_lambda("isnil (list[Nat] [])", "true");
+        expect_lambda("isnil (list[Nat] [1])", "false");
     }
 
     #[test]
     fn head() {
-        expect_lambda("head[Nat] (list[Nat] [1, 2, 3])", "1");
+        expect_lambda("head (list[Nat] [1, 2, 3])", "1");
     }
 
     #[test]
     fn tail() {
-        expect_lambda("tail[Nat] (list[Nat] [1, 2, 3])", "list[Nat] [2, 3]");
+        expect_lambda("tail (list[Nat] [1, 2, 3])", "list[Nat] [2, 3]");
     }
 }

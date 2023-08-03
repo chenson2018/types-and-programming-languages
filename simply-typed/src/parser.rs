@@ -137,14 +137,12 @@ impl<'a> Parser<'a> {
                 token: token @ (TokenType::IsNil | TokenType::Head | TokenType::Tail),
                 ..
             } => {
-                self.expect(TokenType::LeftBracket)?;
-                let dtype = self.dtype()?;
                 let t1 = self.expr()?;
 
                 let term = match token {
-                    TokenType::IsNil => Term::IsNil(dtype, box t1),
-                    TokenType::Head => Term::Head(dtype, box t1),
-                    TokenType::Tail => Term::Tail(dtype, box t1),
+                    TokenType::IsNil => Term::IsNil(box t1),
+                    TokenType::Head => Term::Head(box t1),
+                    TokenType::Tail => Term::Tail(box t1),
                     _ => unreachable!(),
                 };
 
@@ -175,7 +173,7 @@ impl<'a> Parser<'a> {
                 terms = terms.into_iter().rev().collect();
 
                 Ok(terms.iter().fold(Term::Nil(dtype.clone()), |acc, t| {
-                    Term::Cons(dtype.clone(), box t.clone(), box acc)
+                    Term::Cons(box t.clone(), box acc)
                 }))
             }
             Token {
@@ -190,11 +188,9 @@ impl<'a> Parser<'a> {
                 token: TokenType::Cons,
                 ..
             } => {
-                self.expect(TokenType::LeftBracket)?;
-                let dtype = self.dtype()?;
                 let t1 = self.primary()?;
                 let t2 = self.primary()?;
-                Ok(Term::Cons(dtype, box t1, box t2))
+                Ok(Term::Cons(box t1, box t2))
             }
             // TODO make this a term instead of a derived form
             Token {

@@ -17,10 +17,10 @@ pub enum Term {
     IsZero(Box<Term>),
     Fix(Box<Term>),
     Nil(Type),
-    Cons(Type, Box<Term>, Box<Term>),
-    IsNil(Type, Box<Term>),
-    Head(Type, Box<Term>),
-    Tail(Type, Box<Term>),
+    Cons(Box<Term>, Box<Term>),
+    IsNil(Box<Term>),
+    Head(Box<Term>),
+    Tail(Box<Term>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -208,11 +208,11 @@ impl Display for Term {
                 let mut term = self.clone();
                 loop {
                     match term {
-                        Term::Cons(_, t1, box Term::Nil(_)) => {
+                        Term::Cons(t1, box Term::Nil(_)) => {
                             write!(f, "{}", t1)?;
                             break;
                         }
-                        Term::Cons(_, t1, t2) => {
+                        Term::Cons(t1, t2) => {
                             write!(f, "{}, ", t1)?;
                             term = *t2;
                         }
@@ -225,9 +225,9 @@ impl Display for Term {
                 write!(f, "]")
             }
             Self::Nil(_) => write!(f, "[]"),
-            Self::IsNil(_, t1) => write!(f, "isnil({t1})"),
-            Self::Head(_, t1) => write!(f, "head({t1})"),
-            Self::Tail(_, t1) => write!(f, "tail({t1})"),
+            Self::IsNil(t1) => write!(f, "isnil({t1})"),
+            Self::Head(t1) => write!(f, "head({t1})"),
+            Self::Tail(t1) => write!(f, "tail({t1})"),
         }
     }
 }
@@ -442,40 +442,27 @@ impl Term {
                 }
             }
             Term::Nil(dtype) => Ok(Type::List(box dtype.clone())),
-            Term::Cons(dtype, t1, t2) => {
+            Term::Cons(t1, t2) => {
                 let t1_type = t1.dtype_priv(&ctx)?;
                 let t2_type = t2.dtype_priv(&ctx)?;
-                if &t1_type == dtype && t2_type == Type::List(box dtype.clone()) {
-                    Ok(Type::List(box dtype.clone()))
+                if t2_type == Type::List(box t1_type.clone()) {
+                    Ok(t2_type)
                 } else {
                     Err("inconsistent list typing")
                 }
             }
-            Term::IsNil(dtype, t1) => {
-                let t1_type = t1.dtype_priv(&ctx)?;
-                if Type::List(box dtype.clone()) == t1_type {
-                    Ok(Type::Bool)
-                } else {
-                    Err("inconsistent list typing")
-                }
+            Term::IsNil(t1) => {
+                t1.dtype_priv(&ctx)?;
+                Ok(Type::Bool)
             }
-            Term::Head(dtype, t1) => {
-                let t1_type = t1.dtype_priv(&ctx)?;
-                if Type::List(box dtype.clone()) == t1_type {
-                    Ok(dtype.clone())
-                } else {
-                    Err("inconsistent list typing")
-                }
-            }
-            Term::Tail(dtype, t1) => {
-                let t1_type = t1.dtype_priv(&ctx)?;
-                let tail_type = Type::List(box dtype.clone());
-                if tail_type == t1_type {
-                    Ok(tail_type)
-                } else {
-                    Err("inconsistent list typing")
-                }
-            }
+            Term::Head(t1) => match t1.dtype_priv(&ctx)? {
+                Type::List(list_contents) => Ok(*list_contents),
+                _ => Err("non-list head"),
+            },
+            Term::Tail(t1) => match t1.dtype_priv(&ctx)? {
+                t1_type @ Type::List(_) => Ok(t1_type),
+                _ => Err("non-list tail"),
+            },
         }
     }
 
@@ -506,12 +493,12 @@ impl Term {
             Term::False => TermAnon::False,
             Term::Zero => TermAnon::Zero,
             Term::Nil(_) => TermAnon::Nil,
-            Term::Cons(_, t1, t2) => {
+            Term::Cons(t1, t2) => {
                 TermAnon::Cons(box t1.remove_names(ctx), box t2.remove_names(ctx))
             }
-            Term::IsNil(_, t1) => TermAnon::IsNil(box t1.remove_names(ctx)),
-            Term::Head(_, t1) => TermAnon::Head(box t1.remove_names(ctx)),
-            Term::Tail(_, t1) => TermAnon::Tail(box t1.remove_names(ctx)),
+            Term::IsNil(t1) => TermAnon::IsNil(box t1.remove_names(ctx)),
+            Term::Head(t1) => TermAnon::Head(box t1.remove_names(ctx)),
+            Term::Tail(t1) => TermAnon::Tail(box t1.remove_names(ctx)),
         }
     }
 
@@ -537,7 +524,7 @@ impl Term {
                 consq.extract_vars(h);
                 alt.extract_vars(h);
             }
-            Term::App(t1, t2) | Term::Cons(_, t1, t2) => {
+            Term::App(t1, t2) | Term::Cons(t1, t2) => {
                 t1.extract_vars(h);
                 t2.extract_vars(h);
             }
@@ -546,9 +533,9 @@ impl Term {
             | Term::IsZero(t1)
             | Term::Fix(t1)
             | Term::Pred(t1)
-            | Term::IsNil(_, t1)
-            | Term::Head(_, t1)
-            | Term::Tail(_, t1) => t1.extract_vars(h),
+            | Term::IsNil(t1)
+            | Term::Head(t1)
+            | Term::Tail(t1) => t1.extract_vars(h),
             Term::False | Term::True | Term::Zero | Term::Nil(_) => (),
         }
     }

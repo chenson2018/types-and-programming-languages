@@ -46,10 +46,10 @@ mod test {
     #[test]
     fn list() {
         expect_type("list[Nat] [1, 2, 3]", Type::List(Box::new(Type::Nat)));
-        expect_type("isnil[Nat] (list[Nat] [1, 2, 3])", Type::Bool);
-        expect_type("head[Nat] (list[Nat] [1, 2, 3])", Type::Nat);
+        expect_type("isnil (list[Nat] [1, 2, 3])", Type::Bool);
+        expect_type("head (list[Nat] [1, 2, 3])", Type::Nat);
         expect_type(
-            "tail[Nat] (list[Nat] [1, 2, 3])",
+            "tail (list[Nat] [1, 2, 3])",
             Type::List(Box::new(Type::Nat)),
         );
     }
@@ -78,17 +78,5 @@ mod test {
     #[test]
     fn inconsistent_list_typing() {
         expect_err("list[Nat] [1, true]", "inconsistent list typing");
-        expect_err(
-            "isnil[Bool] (list[Nat] [1, 2, 3])",
-            "inconsistent list typing",
-        );
-        expect_err(
-            "head[Bool] (list[Nat] [1, 2, 3])",
-            "inconsistent list typing",
-        );
-        expect_err(
-            "tail[Bool] (list[Nat] [1, 2, 3])",
-            "inconsistent list typing",
-        );
     }
 }

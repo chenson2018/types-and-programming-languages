@@ -12,6 +12,7 @@ lazy_static! {
             (var("times"), Term::times()),
             (var("pow"), Term::pow()),
             (var("fact"), Term::fact()),
+            (var("rev_nat"), Term::rev_nat()),
         ])
     };
 }
@@ -149,5 +150,41 @@ impl Term {
                 ),
             ),
         ))
+    }
+
+    pub fn rev_nat() -> Self {
+        app(
+            Term::Fix(box abs(
+                "f",
+                con(
+                    &Type::List(box Type::Nat),
+                    &con(&Type::List(box Type::Nat), &Type::List(box Type::Nat)),
+                ),
+                abs(
+                    "x",
+                    Type::List(box Type::Nat),
+                    abs(
+                        "y",
+                        Type::List(box Type::Nat),
+                        Term::If(
+                            box Term::IsNil(Type::Nat, box var("y")),
+                            box var("x"),
+                            box app(
+                                app(
+                                    var("f"),
+                                    Term::Cons(
+                                        Type::Nat,
+                                        box Term::Head(Type::Nat, box var("y")),
+                                        box var("x"),
+                                    ),
+                                ),
+                                Term::Tail(Type::Nat, box var("y")),
+                            ),
+                        ),
+                    ),
+                ),
+            )),
+            Term::Nil(Type::Nat),
+        )
     }
 }

@@ -63,4 +63,9 @@ mod test {
         expect_lambda("fact 1", "1");
         expect_lambda("fact 0", "1");
     }
+
+    #[test]
+    fn rev_nat() {
+        expect_lambda("rev_nat (list[Nat] [1, 2, 3])", "list[Nat] [3, 2, 1]");
+    }
 }

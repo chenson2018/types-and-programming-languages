@@ -166,7 +166,10 @@ impl Display for TermAnon {
                             write!(f, "{}, ", t1)?;
                             term = *t2;
                         }
-                        _ => unreachable!(),
+                        _ => {
+                            write!(f, "{}", term)?;
+                            break;
+                        }
                     };
                 }
                 write!(f, "]")
@@ -213,7 +216,10 @@ impl Display for Term {
                             write!(f, "{}, ", t1)?;
                             term = *t2;
                         }
-                        _ => unreachable!(),
+                        _ => {
+                            write!(f, "{}", term)?;
+                            break;
+                        }
                     };
                 }
                 write!(f, "]")
@@ -291,7 +297,9 @@ impl TermAnon {
             TermAnon::Cons(t1, t2) => {
                 TermAnon::Cons(box t1.shift_cutoff(c, d), box t2.shift_cutoff(c, d))
             }
-            _ => todo!(),
+            TermAnon::IsNil(t1) => TermAnon::IsNil(box t1.shift_cutoff(c, d)),
+            TermAnon::Head(t1) => TermAnon::Head(box t1.shift_cutoff(c, d)),
+            TermAnon::Tail(t1) => TermAnon::Tail(box t1.shift_cutoff(c, d)),
         }
     }
 
@@ -315,7 +323,9 @@ impl TermAnon {
             }
             TermAnon::False | TermAnon::True | TermAnon::Zero | TermAnon::Nil => self.clone(),
             TermAnon::Cons(t1, t2) => TermAnon::Cons(box t1.sub(j, s), box t2.sub(j, s)),
-            _ => todo!(),
+            TermAnon::IsNil(t1) => TermAnon::IsNil(box t1.sub(j, s)),
+            TermAnon::Head(t1) => TermAnon::Head(box t1.sub(j, s)),
+            TermAnon::Tail(t1) => TermAnon::Tail(box t1.sub(j, s)),
         }
     }
 
@@ -450,7 +460,7 @@ impl Term {
                 }
             }
             Term::Head(dtype, t1) => {
-                let t1_type = t1.dtype()?;
+                let t1_type = t1.dtype_priv(&ctx)?;
                 if Type::List(box dtype.clone()) == t1_type {
                     Ok(dtype.clone())
                 } else {
@@ -458,7 +468,7 @@ impl Term {
                 }
             }
             Term::Tail(dtype, t1) => {
-                let t1_type = t1.dtype()?;
+                let t1_type = t1.dtype_priv(&ctx)?;
                 let tail_type = Type::List(box dtype.clone());
                 if tail_type == t1_type {
                     Ok(tail_type)

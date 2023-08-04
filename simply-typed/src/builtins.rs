@@ -3,16 +3,16 @@ use crate::types::{con, Type};
 use std::collections::HashMap;
 
 lazy_static! {
-    pub static ref BUILTINS: HashMap<Term, Term> = {
+    pub static ref BUILTINS: HashMap<&'static str, Term> = {
         HashMap::from([
-            (var("and"), Term::and()),
-            (var("or"), Term::or()),
-            (var("not"), Term::not()),
-            (var("plus"), Term::plus()),
-            (var("times"), Term::times()),
-            (var("pow"), Term::pow()),
-            (var("fact"), Term::fact()),
-            (var("rev_nat"), Term::rev_nat()),
+            ("and", Term::and()),
+            ("or", Term::or()),
+            ("not", Term::not()),
+            ("plus", Term::plus()),
+            ("times", Term::times()),
+            ("pow", Term::pow()),
+            ("fact", Term::fact()),
+            ("rev_nat", Term::rev_nat()),
         ])
     };
 }

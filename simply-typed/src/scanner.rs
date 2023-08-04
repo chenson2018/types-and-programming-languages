@@ -107,6 +107,7 @@ pub struct Token {
     pub(crate) token: TokenType,
     pub(crate) term: Option<Term>,
     pub(crate) dtype: Option<Type>,
+    pub(crate) name: Option<String>,
 }
 
 pub struct Scanner {
@@ -152,6 +153,7 @@ impl Scanner {
             token,
             term: None,
             dtype: None,
+            name: None,
         });
     }
 
@@ -160,6 +162,7 @@ impl Scanner {
             token,
             term: Some(term),
             dtype: None,
+            name: None,
         });
     }
 
@@ -168,6 +171,16 @@ impl Scanner {
             token,
             term: None,
             dtype: Some(dtype),
+            name: None,
+        });
+    }
+
+    fn add_name_token(&mut self, token: TokenType, name: String) {
+        self.tokens.push(Token {
+            token,
+            term: None,
+            dtype: None,
+            name: Some(name),
         });
     }
 
@@ -192,7 +205,7 @@ impl Scanner {
         } else if let Some((tt, value)) = VALUES.get(&lexeme) {
             self.add_term_token(*tt, value.clone())
         } else {
-            self.add_term_token(TokenType::Name, Term::Var(binding));
+            self.add_name_token(TokenType::Name, binding);
         };
     }
 

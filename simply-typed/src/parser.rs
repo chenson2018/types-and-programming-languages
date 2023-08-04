@@ -1,6 +1,6 @@
 use crate::builtins::BUILTINS;
 use crate::scanner::{Scanner, Token, TokenType};
-use crate::term::{abs, app, Term};
+use crate::term::{abs, app, var, Term};
 use crate::types::Type;
 
 #[derive(Debug)]
@@ -203,7 +203,7 @@ impl<'a> Parser<'a> {
                 let e1 = self.expr()?;
                 self.expect(TokenType::In)?;
                 let e2 = self.expr()?;
-                if let Some(Term::Var(name)) = binding.term {
+                if let Some(name) = binding.name {
                     Ok(app(abs(name, dtype, e2), e1))
                 } else {
                     Err("let missing binding".into())
@@ -216,7 +216,7 @@ impl<'a> Parser<'a> {
                 let binding = self.expect(TokenType::Name)?;
                 self.expect(TokenType::Colon)?;
                 let dtype = self.dtype()?;
-                if let Some(Term::Var(name)) = binding.term {
+                if let Some(name) = binding.name {
                     Ok(abs(&name, dtype, self.expr()?))
                 } else {
                     Err("lambda missing binding".into())
@@ -259,13 +259,13 @@ impl<'a> Parser<'a> {
             }
             Token {
                 token: TokenType::Name,
-                term: Some(term),
+                name: Some(name),
                 ..
             } => {
-                if let Some(builtin) = BUILTINS.get(&term) {
+                if let Some(builtin) = BUILTINS.get(name.as_str()) {
                     Ok(builtin.clone())
                 } else {
-                    Ok(term)
+                    Ok(var(name))
                 }
             }
             Token {

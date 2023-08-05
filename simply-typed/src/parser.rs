@@ -55,6 +55,10 @@ impl<'a> Parser<'a> {
         self.peek().token == t
     }
 
+    fn check_raw(&mut self, t: TokenType) -> bool {
+        self.peek().token == t
+    }
+
     fn expect(&mut self, tt: TokenType) -> Result<Token, String> {
         if self.check(tt) {
             Ok(self.advance())
@@ -63,17 +67,100 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(dead_code)]
+    fn match_any<T>(&mut self, types: T) -> bool
+    where
+        T: IntoIterator<Item = TokenType>,
+    {
+        for t in types {
+            if self.check_raw(t) {
+                self.advance();
+                return true;
+            }
+        }
+        false
+    }
+
+    fn check_any<T>(&mut self, types: T) -> bool
+    where
+        T: IntoIterator<Item = TokenType>,
+    {
+        for t in types {
+            if self.check_raw(t) {
+                return true;
+            }
+        }
+        false
+    }
+
     fn dtype(&mut self) -> Result<Type, String> {
         let mut types: Vec<Type> = Vec::new();
 
         loop {
-            match self.advance() {
+            // these are tokens that mark the start or end boundary
+            if !self.check_any([
+                TokenType::Lt,
+                TokenType::Gt,
+                TokenType::ListType,
+                TokenType::NatType,
+                TokenType::BoolType,
+                TokenType::UnitType,
+                TokenType::LeftParen,
+                TokenType::RightParen,
+                TokenType::Arrow,
+                TokenType::LeftBracket,
+                TokenType::RightBracket,
+                TokenType::Equal,
+                TokenType::Comma,
+                TokenType::Eof,
+                TokenType::Dot,
+            ]) {
+                return Err(format!("unexpected {:?} in type", self.peek()));
+            };
+
+            let current = self.peek();
+
+            // these are tokens that mark the end boundary
+            // this ensures the caller matches the boundary, as opposed to consuming it here
+            match current.token {
+                TokenType::RightBracket
+                | TokenType::Equal
+                | TokenType::RightParen
+                | TokenType::Dot
+                | TokenType::Comma
+                | TokenType::Eof => (),
+                _ => {
+                    self.advance();
+                }
+            };
+
+            match current {
+                // TODO this might need some work for nested variants
+                Token {
+                    token: TokenType::Lt,
+                    ..
+                } => {
+                    let mut variant = Vec::new();
+
+                    loop {
+                        let name = self.expect(TokenType::Name)?.name.expect("missing name");
+                        self.expect(TokenType::Colon)?;
+                        variant.push((name, self.dtype()?));
+                        if self.previous().token == TokenType::Gt {
+                            break;
+                        } else {
+                            self.expect(TokenType::Comma)?;
+                        }
+                    }
+                    types.push(Type::Variant(variant));
+                }
                 Token {
                     token: TokenType::ListType,
                     ..
                 } => {
                     self.expect(TokenType::LeftBracket)?;
                     let dtype = self.dtype()?;
+                    self.expect(TokenType::RightBracket)?;
                     types.push(Type::List(box dtype));
                 }
                 Token {
@@ -84,22 +171,14 @@ impl<'a> Parser<'a> {
                     ..
                 } => {
                     let dtype = self.dtype()?;
+                    self.expect(TokenType::RightParen)?;
                     types.push(dtype);
                 }
                 Token {
                     token: TokenType::Arrow,
                     ..
                 } => (),
-                Token {
-                    token:
-                        TokenType::Dot
-                        | TokenType::RightParen
-                        | TokenType::RightBracket
-                        | TokenType::LeftBracket
-                        | TokenType::Equal,
-                    ..
-                } => break,
-                Token { token, .. } => return Err(format!("Invalid token {:?} in type", token)),
+                _ => break,
             }
         }
 
@@ -122,6 +201,9 @@ impl<'a> Parser<'a> {
             && !self.check(TokenType::Then)
             && !self.check(TokenType::Else)
             && !self.check(TokenType::In)
+            && !self.check(TokenType::Gt)
+            && !self.check(TokenType::Of)
+            && !self.check(TokenType::VertBar)
         {
             terms.push(self.primary()?);
         }
@@ -133,6 +215,45 @@ impl<'a> Parser<'a> {
 
     fn primary(&mut self) -> Result<Term, String> {
         match self.advance() {
+            Token {
+                token: TokenType::Lt,
+                ..
+            } => {
+                let var_name = self.expect(TokenType::Name)?.name.expect("missing name");
+                self.expect(TokenType::Equal)?;
+                let term = self.expr()?;
+                self.expect(TokenType::Gt)?;
+                self.expect(TokenType::As)?;
+                let dtype = self.dtype()?;
+                Ok(Term::Tag(var_name, box term, dtype))
+            }
+            Token {
+                token: TokenType::Case,
+                ..
+            } => {
+                // TODO this might fail for more complex expressions
+                let case_term = self.expr()?;
+                self.expect(TokenType::Of)?;
+                let mut cases: Vec<(String, String, Term)> = Vec::new();
+
+                while self.check(TokenType::Lt) {
+                    self.expect(TokenType::Lt)?;
+                    let var_name = self.expect(TokenType::Name)?.name.expect("missing name");
+                    self.expect(TokenType::Equal)?;
+                    let binding = self.expect(TokenType::Name)?.name.expect("missing name");
+                    self.expect(TokenType::Gt)?;
+                    self.expect(TokenType::Arrow)?;
+                    let term = self.expr()?;
+                    cases.push((var_name, binding, term));
+
+                    if self.check(TokenType::VertBar) {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                Ok(Term::Case(box case_term, cases))
+            }
             Token {
                 token: token @ (TokenType::IsNil | TokenType::Head | TokenType::Tail),
                 ..
@@ -155,6 +276,9 @@ impl<'a> Parser<'a> {
             } => {
                 self.expect(TokenType::LeftBracket)?;
                 let dtype = self.dtype()?;
+                self.expect(TokenType::RightBracket)?;
+
+                // start of the list
                 self.expect(TokenType::LeftBracket)?;
                 let mut terms: Vec<Term> = Vec::new();
 
@@ -182,6 +306,7 @@ impl<'a> Parser<'a> {
             } => {
                 self.expect(TokenType::LeftBracket)?;
                 let dtype = self.dtype()?;
+                self.expect(TokenType::RightBracket)?;
                 Ok(Term::Nil(dtype))
             }
             Token {
@@ -200,6 +325,7 @@ impl<'a> Parser<'a> {
                 let binding = self.expect(TokenType::Name)?;
                 self.expect(TokenType::Colon)?;
                 let dtype = self.dtype()?;
+                self.expect(TokenType::Equal)?;
                 let e1 = self.expr()?;
                 self.expect(TokenType::In)?;
                 let e2 = self.expr()?;
@@ -216,6 +342,7 @@ impl<'a> Parser<'a> {
                 let binding = self.expect(TokenType::Name)?;
                 self.expect(TokenType::Colon)?;
                 let dtype = self.dtype()?;
+                self.expect(TokenType::Dot)?;
                 if let Some(name) = binding.name {
                     Ok(abs(&name, dtype, self.expr()?))
                 } else {

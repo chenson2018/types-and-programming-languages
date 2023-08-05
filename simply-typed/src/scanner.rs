@@ -18,6 +18,9 @@ lazy_static! {
             (',', TokenType::Comma),
             ('[', TokenType::LeftBracket),
             (']', TokenType::RightBracket),
+            ('<', TokenType::Lt),
+            ('>', TokenType::Gt),
+            ('|', TokenType::VertBar),
         ])
     };
     static ref KEYWORDS: HashMap<&'static str, TokenType> = {
@@ -37,18 +40,23 @@ lazy_static! {
             ("tail", TokenType::Tail),
             ("list", TokenType::ListSugar),
             ("List", TokenType::ListType),
+            ("case", TokenType::Case),
+            ("of", TokenType::Of),
+            ("as", TokenType::As),
         ])
     };
     static ref TYPES: HashMap<&'static str, (TokenType, Type)> = {
         HashMap::from([
             ("Bool", (TokenType::BoolType, Type::Bool)),
             ("Nat", (TokenType::NatType, Type::Nat)),
+            ("Unit", (TokenType::UnitType, Type::Unit)),
         ])
     };
     static ref VALUES: HashMap<&'static str, (TokenType, Term)> = {
         HashMap::from([
             ("false", (TokenType::False, Term::False)),
             ("true", (TokenType::True, Term::True)),
+            ("unit", (TokenType::Unit, Term::Unit)),
         ])
     };
 }
@@ -73,6 +81,14 @@ pub enum TokenType {
     Comma,
     ListSugar,
 
+    // for variants
+    Lt,
+    Gt,
+    Case,
+    Of,
+    VertBar,
+    As,
+
     // if expressions
     If,
     Then,
@@ -85,11 +101,13 @@ pub enum TokenType {
     True,
     IsZero,
     Pred,
+    Unit,
 
     // for types
     ListType,
     BoolType,
     NatType,
+    UnitType,
     Colon,
     Arrow,
 

@@ -5,42 +5,62 @@ use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
+    // base lambda calculus terms
     Var(String),
     Abs(String, Type, Box<Term>),
     App(Box<Term>, Box<Term>),
+    // Bool
     True,
     False,
+    If(Box<Term>, Box<Term>, Box<Term>),
+    // Nat
     Zero,
     Succ(Box<Term>),
-    If(Box<Term>, Box<Term>, Box<Term>),
     Pred(Box<Term>),
     IsZero(Box<Term>),
+    // fixed point
     Fix(Box<Term>),
+    // lists
     Nil(Type),
     Cons(Box<Term>, Box<Term>),
     IsNil(Box<Term>),
     Head(Box<Term>),
     Tail(Box<Term>),
+    // variants
+    Tag(String, Box<Term>, Type),
+    Case(Box<Term>, Vec<(String, String, Term)>),
+    // unit
+    Unit,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TermAnon {
+    // base lambda calculus terms
     Var(usize),
     Abs(Box<TermAnon>),
     App(Box<TermAnon>, Box<TermAnon>),
+    // Bool
     True,
     False,
+    If(Box<TermAnon>, Box<TermAnon>, Box<TermAnon>),
+    // Nat
     Zero,
     Succ(Box<TermAnon>),
-    If(Box<TermAnon>, Box<TermAnon>, Box<TermAnon>),
     Pred(Box<TermAnon>),
     IsZero(Box<TermAnon>),
+    // fixed point
     Fix(Box<TermAnon>),
+    // lists
     Nil,
     Cons(Box<TermAnon>, Box<TermAnon>),
     IsNil(Box<TermAnon>),
     Head(Box<TermAnon>),
     Tail(Box<TermAnon>),
+    // variants
+    Tag(String, Box<TermAnon>),
+    Case(Box<TermAnon>, Vec<(String, TermAnon)>),
+    // unit
+    Unit,
 }
 
 impl From<usize> for Term {
@@ -144,9 +164,9 @@ impl Display for TermAnon {
             Self::Abs(body) => write!(f, "(λ. {})", body),
             Self::False => write!(f, "false"),
             Self::True => write!(f, "true"),
-            Self::Zero => write!(f, "nat_0"),
+            Self::Zero => write!(f, "ℕ0"),
             Self::Succ(term) => match usize::try_from(self) {
-                Ok(i) => write!(f, "nat_{i}"),
+                Ok(i) => write!(f, "ℕ{i}"),
                 Err(_) => write!(f, "succ({})", term),
             },
             Self::If(cond, consq, alt) => write!(f, "if {cond} then {consq} else {alt}"),
@@ -178,6 +198,24 @@ impl Display for TermAnon {
             Self::IsNil(t1) => write!(f, "isnil({t1})"),
             Self::Head(t1) => write!(f, "head({t1})"),
             Self::Tail(t1) => write!(f, "tail({t1})"),
+            Self::Tag(var_name, t1) => write!(f, "<{var_name}={t1}>"),
+            Self::Unit => write!(f, "unit"),
+            Self::Case(t1, cases) => {
+                write!(f, "\ncase {t1} of\n ")?;
+
+                let len = cases.len();
+
+                for (i, (vname, term)) in cases.iter().enumerate() {
+                    write!(f, "  <{vname}> → {term}")?;
+                    if i + 1 < len {
+                        write!(f, "\n|")?;
+                    } else {
+                        writeln!(f)?;
+                    }
+                }
+
+                Ok(())
+            }
         }
     }
 }
@@ -194,9 +232,9 @@ impl Display for Term {
             Self::Abs(name, dtype, body) => write!(f, "(λ{}:{} . {})", name, dtype, body),
             Self::False => write!(f, "false"),
             Self::True => write!(f, "true"),
-            Self::Zero => write!(f, "nat_0"),
+            Self::Zero => write!(f, "ℕ0"),
             Self::Succ(term) => match usize::try_from(self) {
-                Ok(i) => write!(f, "nat_{i}"),
+                Ok(i) => write!(f, "ℕ{i}"),
                 Err(_) => write!(f, "succ({})", term),
             },
             Self::If(cond, consq, alt) => write!(f, "if {cond} then {consq} else {alt}"),
@@ -228,6 +266,24 @@ impl Display for Term {
             Self::IsNil(t1) => write!(f, "isnil({t1})"),
             Self::Head(t1) => write!(f, "head({t1})"),
             Self::Tail(t1) => write!(f, "tail({t1})"),
+            Self::Tag(var_name, t1, dtype) => write!(f, "<{var_name}={t1}> as {dtype}"),
+            Self::Unit => write!(f, "unit"),
+            Self::Case(t1, cases) => {
+                write!(f, "\ncase {t1} of\n ")?;
+
+                let len = cases.len();
+
+                for (i, (vname, bind, term)) in cases.iter().enumerate() {
+                    write!(f, "  <{vname}={bind}> → {term}")?;
+                    if i + 1 < len {
+                        write!(f, "\n|")?;
+                    } else {
+                        writeln!(f)?;
+                    }
+                }
+
+                Ok(())
+            }
         }
     }
 }
@@ -293,13 +349,23 @@ impl TermAnon {
             Self::Succ(t1) => Self::Succ(box t1.shift_cutoff(c, d)),
             Self::Pred(t1) => Self::Pred(box t1.shift_cutoff(c, d)),
             Self::IsZero(t1) => Self::IsZero(box t1.shift_cutoff(c, d)),
-            TermAnon::False | TermAnon::True | TermAnon::Zero | TermAnon::Nil => self.clone(),
+            TermAnon::False | TermAnon::True | TermAnon::Zero | TermAnon::Nil | TermAnon::Unit => {
+                self.clone()
+            }
             TermAnon::Cons(t1, t2) => {
                 TermAnon::Cons(box t1.shift_cutoff(c, d), box t2.shift_cutoff(c, d))
             }
             TermAnon::IsNil(t1) => TermAnon::IsNil(box t1.shift_cutoff(c, d)),
             TermAnon::Head(t1) => TermAnon::Head(box t1.shift_cutoff(c, d)),
             TermAnon::Tail(t1) => TermAnon::Tail(box t1.shift_cutoff(c, d)),
+            TermAnon::Tag(name, t1) => TermAnon::Tag(name.clone(), box t1.shift_cutoff(c, d)),
+            TermAnon::Case(t1, case_terms) => {
+                let anon_cases: Vec<(String, TermAnon)> = case_terms
+                    .iter()
+                    .map(|(vname, term)| (vname.clone(), term.shift_cutoff(c + 1, d)))
+                    .collect();
+                TermAnon::Case(box t1.shift_cutoff(c, d), anon_cases)
+            }
         }
     }
 
@@ -321,11 +387,21 @@ impl TermAnon {
             Self::If(cond, consq, alt) => {
                 Self::If(box cond.sub(j, s), box consq.sub(j, s), box alt.sub(j, s))
             }
-            TermAnon::False | TermAnon::True | TermAnon::Zero | TermAnon::Nil => self.clone(),
+            TermAnon::False | TermAnon::True | TermAnon::Zero | TermAnon::Nil | TermAnon::Unit => {
+                self.clone()
+            }
             TermAnon::Cons(t1, t2) => TermAnon::Cons(box t1.sub(j, s), box t2.sub(j, s)),
             TermAnon::IsNil(t1) => TermAnon::IsNil(box t1.sub(j, s)),
             TermAnon::Head(t1) => TermAnon::Head(box t1.sub(j, s)),
             TermAnon::Tail(t1) => TermAnon::Tail(box t1.sub(j, s)),
+            TermAnon::Tag(name, t1) => TermAnon::Tag(name.clone(), box t1.sub(j, s)),
+            TermAnon::Case(t1, case_terms) => {
+                let anon_cases: Vec<(String, TermAnon)> = case_terms
+                    .iter()
+                    .map(|(vname, term)| (vname.clone(), term.sub(j + 1, &s.shift(1))))
+                    .collect();
+                TermAnon::Case(box t1.sub(j, s), anon_cases)
+            }
         }
     }
 
@@ -375,6 +451,20 @@ impl TermAnon {
             }
             Self::Head(box Self::Cons(box head, _)) => head.full(),
             Self::Tail(box Self::Cons(_, box tail)) => tail.full(),
+            Self::Case(case_term, cases) => {
+                if let Self::Tag(case_term_var, case_term_untag) = case_term.full() {
+                    let (_, select_term) = cases
+                        .iter()
+                        .filter(|(vname, _)| vname == &case_term_var)
+                        .next()
+                        .unwrap();
+                    select_term.clone().sub(0, &case_term_untag).full()
+                } else {
+                    // if the case is not a tag (e.g. an abstract var) I choose to just clone for
+                    Self::Case(case_term.clone(), cases.to_vec())
+                }
+            }
+            Self::Tag(vname, t1) => Self::Tag(vname.into(), box t1.full()),
             _ => self.clone(),
         }
     }
@@ -463,6 +553,60 @@ impl Term {
                 t1_type @ Type::List(_) => Ok(t1_type),
                 _ => Err("non-list tail"),
             },
+            Term::Tag(var_name, t1, dtype) => {
+                if let Type::Variant(var_type_vec) = dtype {
+                    let mut uniq: HashMap<String, Type> = HashMap::new();
+                    // check that type names are unique, and that the tag type is present and
+                    // matches in the variant type
+
+                    if !var_type_vec.into_iter().all(|(vname, vtype)| uniq.insert(vname.clone(), vtype.clone()).is_none()  ) {
+                        Err("variant type with non-unique names")
+                    } else if let Some(var_type) = uniq.get(var_name) && var_type == &t1.dtype()? {
+                        Ok(dtype.clone())
+                    } else {
+                        Err("tag variant incompatible with variant type")
+                    }
+                } else {
+                    Err("tag with non-variant type")
+                }
+            }
+            Term::Unit => Ok(Type::Unit),
+            Term::Case(case_term, cases) => {
+                let case_term_type = case_term.dtype_priv(&ctx)?;
+
+                // all cases should have the same type, which this expression will eval to
+                // cases should match and exhaust all possible cases defined in the type
+                // for simplicity I require the same order
+
+                if let Type::Variant(case_term_type_vec) = case_term_type {
+                    let mut term_types: Vec<Type> = Vec::new();
+
+                    if case_term_type_vec.len() != cases.len() {
+                        return Err("mismatched case variant");
+                    };
+
+                    for ((vname_term, dtype), (vname_case, binding, term)) in
+                        std::iter::zip(case_term_type_vec, cases)
+                    {
+                        let mut ctx = ctx.clone();
+                        ctx.insert(binding.into(), dtype.clone());
+
+                        term_types.push(term.dtype_priv(&ctx)?);
+                        if &vname_term != vname_case {
+                            return Err("mismatched case variant");
+                        }
+                    }
+
+                    let return_type = &term_types[0];
+                    if term_types.iter().all(|t| t == return_type) {
+                        Ok(return_type.clone())
+                    } else {
+                        Err("inconsistent case types")
+                    }
+                } else {
+                    Err("non-tag case")
+                }
+            }
         }
     }
 
@@ -499,6 +643,19 @@ impl Term {
             Term::IsNil(t1) => TermAnon::IsNil(box t1.remove_names(ctx)),
             Term::Head(t1) => TermAnon::Head(box t1.remove_names(ctx)),
             Term::Tail(t1) => TermAnon::Tail(box t1.remove_names(ctx)),
+            Term::Tag(var_name, t1, _) => TermAnon::Tag(var_name.into(), box t1.remove_names(ctx)),
+            Term::Unit => TermAnon::Unit,
+            Term::Case(t1, case_terms) => {
+                let anon_cases: Vec<(String, TermAnon)> = case_terms
+                    .iter()
+                    .map(|(varname, bindname, term)| {
+                        let mut ctx = ctx.clone();
+                        ctx.push(bindname.into());
+                        (varname.clone(), term.remove_names(&ctx))
+                    })
+                    .collect();
+                TermAnon::Case(box t1.remove_names(ctx), anon_cases)
+            }
         }
     }
 
@@ -535,12 +692,20 @@ impl Term {
             | Term::Pred(t1)
             | Term::IsNil(t1)
             | Term::Head(t1)
-            | Term::Tail(t1) => t1.extract_vars(h),
-            Term::False | Term::True | Term::Zero | Term::Nil(_) => (),
+            | Term::Tail(t1)
+            | Term::Tag(_, t1, _) => t1.extract_vars(h),
+            Term::Case(t1, cases) => {
+                t1.extract_vars(h);
+                for (_, _, term) in cases {
+                    term.extract_vars(h);
+                }
+            }
+            Term::False | Term::True | Term::Zero | Term::Nil(_) | Term::Unit => (),
         }
     }
 
     pub fn full(&self) -> TermAnon {
-        self.to_anon().full()
+        let anon = self.to_anon();
+        anon.full()
     }
 }

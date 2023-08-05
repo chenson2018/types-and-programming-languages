@@ -32,4 +32,24 @@ mod test {
     fn tail() {
         expect_lambda("tail (list[Nat] [1, 2, 3])", "list[Nat] [2, 3]");
     }
+
+    #[test]
+    fn variant() {
+        expect_lambda(
+            "case (<a=0> as <a:Nat, b:Bool>) of <a=x> → x | <b=b> → if b then 1 else 0",
+            "0",
+        );
+        expect_lambda(
+            "case (<a=1> as <a:Nat, b:Bool>) of <a=x> → x | <b=b> → if b then 1 else 0",
+            "1",
+        );
+        expect_lambda(
+            "case (<b=true> as <a:Nat, b:Bool>) of <a=x> → x | <b=b> → if b then 1 else 0",
+            "1",
+        );
+        expect_lambda(
+            "case (<b=false> as <a:Nat, b:Bool>) of <a=x> → x | <b=b> → if b then 1 else 0",
+            "0",
+        );
+    }
 }

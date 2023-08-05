@@ -1,6 +1,6 @@
 mod test {
     use simply_typed::term::Term;
-    use simply_typed::types::Type;
+    use simply_typed::types::{con, Type};
 
     fn expect_err(input: &str, expected_err: &str) {
         let term: Term = format!("{}\n", input).parse().unwrap();
@@ -55,6 +55,30 @@ mod test {
     }
 
     #[test]
+    fn tag() {
+        expect_type(
+            "<a=1> as <a:Nat, b:Bool>",
+            Type::Variant(vec![("a".into(), Type::Nat), ("b".into(), Type::Bool)]),
+        )
+    }
+
+    #[test]
+    fn variant() {
+        expect_type(
+            "case (<a=0> as <a:Nat, b:Bool>) of <a=x> → x | <b=b> → if b then 1 else 0",
+            Type::Nat,
+        );
+        // note how x is shadowed here
+        expect_type(
+            r"\x:<a:Nat, b:Bool> . case x of <a=x> → x | <b=b> → if b then 1 else 0",
+            con(
+                &Type::Variant(vec![("a".into(), Type::Nat), ("b".into(), Type::Bool)]),
+                &Type::Nat,
+            ),
+        );
+    }
+
+    #[test]
     fn condition_non_bool() {
         expect_err("if 1 then true else false", "non-boolean condition");
     }
@@ -78,5 +102,57 @@ mod test {
     #[test]
     fn inconsistent_list_typing() {
         expect_err("list[Nat] [1, true]", "inconsistent list typing");
+    }
+
+    #[test]
+    fn unique_variant_names() {
+        expect_err(
+            "<a=1> as <a:Nat, a:Nat>",
+            "variant type with non-unique names",
+        );
+    }
+
+    #[test]
+    fn incompatible_variant_type() {
+        expect_err(
+            "<a=true> as <a:Nat, b:Bool>",
+            "tag variant incompatible with variant type",
+        );
+        expect_err(
+            "<b=1> as <a:Nat, b:Bool>",
+            "tag variant incompatible with variant type",
+        );
+        expect_err(
+            "<c=true> as <a:Nat, b:Bool>",
+            "tag variant incompatible with variant type",
+        );
+    }
+
+    #[test]
+    fn non_tag_case() {
+        expect_err("case 1 of <a=x> → x", "non-tag case");
+    }
+
+    #[test]
+    fn inconsistent_case_types() {
+        expect_err(
+            "case (<a=0> as <a:Nat, b:Bool>) of <a=x> → x | <b=b> → b",
+            "inconsistent case types",
+        );
+    }
+
+    #[test]
+    fn mismatched_case_variant() {
+        // missing a case
+        expect_err(
+            "case (<a=0> as <a:Nat, b:Bool>) of <a=x> → x",
+            "mismatched case variant",
+        );
+
+        // wrong order
+        expect_err(
+            "case (<a=0> as <a:Nat, b:Bool>) of <b=b> → 0 | <a=a> → 1",
+            "mismatched case variant",
+        );
     }
 }

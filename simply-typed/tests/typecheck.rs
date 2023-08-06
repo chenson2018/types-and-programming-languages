@@ -115,6 +115,27 @@ mod test {
     }
 
     #[test]
+    fn type_alias() {
+        expect_type(r"b = Nat; (\x:b . x) 1", Type::Nat);
+        expect_type(
+            r"
+            OptionNat = <none:Unit, some:Nat>;
+            let unwrap_or_zero = \x:OptionNat . case x of <none=a> → 0 | <some=a> → a;
+            unwrap_or_zero <none=unit> as OptionNat",
+            Type::Nat,
+        );
+        expect_type(
+            r"
+            a = Nat;
+            b = Unit;
+            OptionNat = <none:b, some:a>;
+            let unwrap_or_zero = \x:OptionNat . case x of <none=a> → 0 | <some=a> → a;
+            unwrap_or_zero <none=unit> as OptionNat",
+            Type::Nat,
+        );
+    }
+
+    #[test]
     fn condition_non_bool() {
         expect_err("if 1 then true else false", "non-boolean condition");
     }

@@ -5,7 +5,7 @@ mod test {
     fn expect_err(input: &str, expected_err: &str) {
         let term: Term = format!("{}\n", input).parse().unwrap();
         let err = term.dtype().expect_err("Type:");
-        assert_eq!(err, expected_err);
+        assert_eq!(err.label, expected_err);
     }
 
     fn expect_type(input: &str, expected_type: Type) {

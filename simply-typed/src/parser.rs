@@ -230,7 +230,7 @@ impl<'a> Parser<'a> {
 
         if std {
             for (name, t1) in BUILTINS.clone() {
-                term = Term::Let(name.into(), box t1, box term);
+                term = Term::Let(name.into(), box t1, box term, (0, 0));
             }
         }
 
@@ -239,6 +239,8 @@ impl<'a> Parser<'a> {
 
     pub fn expr(&mut self) -> Result<Term, LcError> {
         let mut terms: Vec<Term> = Vec::new();
+
+        let (left, _) = self.peek().range;
 
         while !self.is_end()
             && !self.check(TokenType::RightParen)
@@ -255,9 +257,13 @@ impl<'a> Parser<'a> {
             terms.push(self.primary()?);
         }
 
+        let (_, mut right) = self.peek().range;
+
         let head = &terms[0];
         let tail = &terms[1..];
-        let mut term = tail.iter().fold(head.clone(), |acc, t| app(acc, t.clone()));
+        let mut term = tail
+            .iter()
+            .fold(head.clone(), |acc, t| app(acc, t.clone(), (left, right)));
 
         // check if we are accessing a record from this term, possibly multiple times
         while self.check(TokenType::Dot) {
@@ -266,7 +272,8 @@ impl<'a> Parser<'a> {
                 .expect(TokenType::Name)?
                 .name
                 .expect("missing record accessor");
-            term = Term::Proj(box term, accessor);
+            (_, right) = self.previous().range;
+            term = Term::Proj(box term, accessor, (left, right));
         }
 
         Ok(term)
@@ -278,18 +285,22 @@ impl<'a> Parser<'a> {
                 token: TokenType::Lt,
                 ..
             } => {
+                let (left, _) = self.previous().range;
                 let var_name = self.expect(TokenType::Name)?.name.expect("missing name");
                 self.expect(TokenType::Equal)?;
                 let term = self.expr()?;
                 self.expect(TokenType::Gt)?;
                 self.expect(TokenType::As)?;
                 let dtype = self.dtype()?;
-                Ok(Term::Tag(var_name, box term, dtype))
+                let (_, right) = self.previous().range;
+                let range = (left, right);
+                Ok(Term::Tag(var_name, box term, dtype, range))
             }
             Token {
                 token: TokenType::LeftBrace,
                 ..
             } => {
+                let (left, _) = self.previous().range;
                 let mut records: Vec<(String, Term)> = Vec::new();
                 let mut counter = 0;
 
@@ -314,13 +325,16 @@ impl<'a> Parser<'a> {
                 }
 
                 self.expect(TokenType::RightBrace)?;
+                let (_, right) = self.previous().range;
+                let range = (left, right);
 
-                Ok(Term::Record(records))
+                Ok(Term::Record(records, range))
             }
             Token {
                 token: TokenType::Case,
                 ..
             } => {
+                let (left, _) = self.previous().range;
                 // TODO this might fail for more complex expressions
                 let case_term = self.expr()?;
                 self.expect(TokenType::Of)?;
@@ -342,18 +356,23 @@ impl<'a> Parser<'a> {
                         break;
                     }
                 }
-                Ok(Term::Case(box case_term, cases))
+                let (_, right) = self.previous().range;
+                let range = (left, right);
+                Ok(Term::Case(box case_term, cases, range))
             }
             Token {
                 token: token @ (TokenType::IsNil | TokenType::Head | TokenType::Tail),
                 ..
             } => {
+                let (left, _) = self.previous().range;
                 let t1 = self.expr()?;
+                let (_, right) = self.peek().range;
+                let range = (left, right);
 
                 let term = match token {
-                    TokenType::IsNil => Term::IsNil(box t1),
-                    TokenType::Head => Term::Head(box t1),
-                    TokenType::Tail => Term::Tail(box t1),
+                    TokenType::IsNil => Term::IsNil(box t1, range),
+                    TokenType::Head => Term::Head(box t1, range),
+                    TokenType::Tail => Term::Tail(box t1, range),
                     _ => unreachable!(),
                 };
 
@@ -364,6 +383,8 @@ impl<'a> Parser<'a> {
                 token: TokenType::ListSugar,
                 ..
             } => {
+                let (left, _) = self.previous().range;
+
                 self.expect(TokenType::LeftBracket)?;
                 let dtype = self.dtype()?;
                 self.expect(TokenType::RightBracket)?;
@@ -384,77 +405,98 @@ impl<'a> Parser<'a> {
                     }
                 }
 
+                let (right, _) = self.peek().range;
+                let range = (left, right);
+
                 terms = terms.into_iter().rev().collect();
 
-                Ok(terms.iter().fold(Term::Nil(dtype.clone()), |acc, t| {
-                    Term::Cons(box t.clone(), box acc)
-                }))
+                Ok(terms
+                    .iter()
+                    .fold(Term::Nil(dtype.clone(), range), |acc, t| {
+                        Term::Cons(box t.clone(), box acc, range)
+                    }))
             }
             Token {
                 token: TokenType::Nil,
                 ..
             } => {
+                let (left, _) = self.previous().range;
                 self.expect(TokenType::LeftBracket)?;
                 let dtype = self.dtype()?;
                 self.expect(TokenType::RightBracket)?;
-                Ok(Term::Nil(dtype))
+                let (right, _) = self.peek().range;
+                let range = (left, right);
+                Ok(Term::Nil(dtype, range))
             }
             Token {
                 token: TokenType::Cons,
                 ..
             } => {
+                let (left, _) = self.previous().range;
                 let t1 = self.primary()?;
                 let t2 = self.primary()?;
-                Ok(Term::Cons(box t1, box t2))
+                let (right, _) = self.peek().range;
+                let range = (left, right);
+                Ok(Term::Cons(box t1, box t2, range))
             }
             Token {
                 token: TokenType::Let,
                 ..
             } => {
+                let (left, _) = self.previous().range;
                 let name = self.expect(TokenType::Name)?.name.expect("missing name");
                 self.expect(TokenType::Equal)?;
                 let t1 = self.expr()?;
                 self.expect(TokenType::In)?;
                 let t2 = self.expr()?;
-                Ok(Term::Let(name, box t1, box t2))
+                let (right, _) = self.peek().range;
+                let range = (left, right);
+                Ok(Term::Let(name, box t1, box t2, range))
             }
             Token {
                 token: TokenType::Lambda,
                 ..
             } => {
+                let (left, _) = self.previous().range;
                 let name = self.expect(TokenType::Name)?.name.expect("missing name");
                 self.expect(TokenType::Colon)?;
                 let dtype = self.dtype()?;
                 self.expect(TokenType::Dot)?;
-                Ok(abs(&name, dtype, self.expr()?))
+                let t1 = self.expr()?;
+                let (_, right) = self.peek().range;
+                Ok(abs(&name, dtype, t1, (left, right)))
             }
             Token {
                 token: TokenType::If,
                 ..
             } => {
+                let (left, _) = self.previous().range;
                 let cond = self.expr()?;
                 self.expect(TokenType::Then)?;
                 let consq = self.expr()?;
                 self.expect(TokenType::Else)?;
                 let alt = self.expr()?;
-                Ok(Term::If(box cond, box consq, box alt))
+                let (_, right) = self.peek().range;
+                let range = (left, right);
+                Ok(Term::If(box cond, box consq, box alt, range))
             }
             Token {
-                token: TokenType::IsZero,
+                token: tt @ (TokenType::IsZero | TokenType::Pred | TokenType::Succ | TokenType::Fix),
                 ..
-            } => Ok(Term::IsZero(box self.expr()?)),
-            Token {
-                token: TokenType::Pred,
-                ..
-            } => Ok(Term::Pred(box self.expr()?)),
-            Token {
-                token: TokenType::Succ,
-                ..
-            } => Ok(Term::Succ(box self.expr()?)),
-            Token {
-                token: TokenType::Fix,
-                ..
-            } => Ok(Term::Fix(box self.expr()?)),
+            } => {
+                let range = self.previous().range;
+                let term = self.expr()?;
+
+                let term = match tt {
+                    TokenType::IsZero => Term::IsZero(box term, range),
+                    TokenType::Pred => Term::Pred(box term, range),
+                    TokenType::Succ => Term::Succ(box term, range),
+                    TokenType::Fix => Term::Fix(box term, range),
+                    _ => unreachable!(),
+                };
+
+                Ok(term)
+            }
             Token {
                 token: TokenType::LeftParen,
                 ..
@@ -467,7 +509,7 @@ impl<'a> Parser<'a> {
                 token: TokenType::Name,
                 name: Some(name),
                 ..
-            } => Ok(var(name)),
+            } => Ok(var(name, self.previous().range)),
             Token {
                 term: Some(term), ..
             } => Ok(term),

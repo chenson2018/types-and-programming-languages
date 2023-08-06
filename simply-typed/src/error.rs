@@ -9,7 +9,7 @@ use annotate_snippets::{
 
 #[derive(Debug, Clone)]
 pub struct LcError {
-    pub(crate) label: String,
+    pub label: String,
     range: (usize, usize),
 }
 
@@ -19,7 +19,7 @@ impl LcError {
         S: Into<String> + std::fmt::Display,
     {
         Self {
-            label: format!("\x1b[31m{label}\x1b[0m"),
+            label: label.to_string(),
             range,
         }
     }
@@ -30,16 +30,14 @@ pub struct LcErrorReporter {
     error: LcError,
     path: PathBuf,
     source: String,
-    title: String,
 }
 
 impl LcErrorReporter {
-    pub fn new(error: LcError, path: PathBuf, source: String, title: &str) -> Self {
+    pub fn new(error: LcError, path: PathBuf, source: String) -> Self {
         Self {
             error,
             path,
             source,
-            title: title.into(),
         }
     }
 }
@@ -50,14 +48,14 @@ impl Display for LcErrorReporter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let snip = Snippet {
             title: Some(Annotation {
-                label: Some(&self.title),
+                label: Some(&self.error.label),
                 id: None,
                 annotation_type: AnnotationType::Error,
             }),
             footer: vec![],
             slices: vec![Slice {
                 source: &self.source,
-                line_start: 1,
+                line_start: 0,
                 origin: self.path.to_str(),
                 fold: false,
                 annotations: vec![SourceAnnotation {

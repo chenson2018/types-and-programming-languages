@@ -49,8 +49,10 @@ fn main() -> Result<(), MainError> {
             println!("Input code:\n\n{}\n", ast);
 
             if !args.skip_typecheck {
-                let dtype = ast.dtype()?;
-                println!("Type:\n\n{}\n", dtype);
+                match ast.dtype() {
+                    Ok(dtype) => println!("Type:\n\n{}\n", dtype),
+                    Err(e) => return Err(LcErrorReporter::new(e, args.path, source).into()),
+                }
             }
 
             if !args.skip_eval {
@@ -59,6 +61,6 @@ fn main() -> Result<(), MainError> {
 
             Ok(())
         }
-        Err(e) => Err(LcErrorReporter::new(e, args.path, source, "Parser").into()),
+        Err(e) => Err(LcErrorReporter::new(e, args.path, source).into()),
     }
 }

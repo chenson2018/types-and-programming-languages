@@ -220,8 +220,16 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    pub fn parse(&mut self) -> Result<Term, String> {
-        self.expr()
+    pub fn parse(&mut self, std: bool) -> Result<Term, String> {
+        let mut term = self.expr()?;
+
+        if std {
+            for (name, t1) in BUILTINS.clone() {
+                term = Term::Let(name.into(), box t1, box term);
+            }
+        }
+
+        Ok(term)
     }
 
     pub fn expr(&mut self) -> Result<Term, String> {
@@ -465,13 +473,7 @@ impl<'a> Parser<'a> {
                 token: TokenType::Name,
                 name: Some(name),
                 ..
-            } => {
-                if let Some(builtin) = BUILTINS.get(name.as_str()) {
-                    Ok(builtin.clone())
-                } else {
-                    Ok(var(name))
-                }
-            }
+            } => Ok(var(name)),
             Token {
                 term: Some(term), ..
             } => Ok(term),

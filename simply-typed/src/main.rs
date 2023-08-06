@@ -19,6 +19,9 @@ pub struct Cli {
     #[arg(long)]
     skip_eval: bool,
 
+    #[arg(long)]
+    std: bool,
+
     path: PathBuf,
 }
 
@@ -34,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut parser = Parser::from(&scanner);
-    let ast = parser.parse()?;
+    let ast = parser.parse(args.std)?;
 
     if args.ast {
         println!("AST: \n\n{:#?}\n", ast);

@@ -8,6 +8,7 @@ pub enum Type {
     List(Box<Type>),
     Unit,
     Variant(Vec<(String, Type)>),
+    Record(Vec<(String, Type)>),
 }
 
 pub fn con(t1: &Type, t2: &Type) -> Type {
@@ -34,6 +35,19 @@ impl Display for Type {
                 }
 
                 write!(f, ">")
+            }
+            Type::Record(vec) => {
+                write!(f, "{{")?;
+                let len = vec.len();
+
+                for (i, (name, dtype)) in vec.iter().enumerate() {
+                    write!(f, "{name}:{dtype}")?;
+                    if i + 1 < len {
+                        write!(f, ", ")?;
+                    }
+                }
+
+                write!(f, "}}")
             }
         }
     }

@@ -79,6 +79,42 @@ mod test {
     }
 
     #[test]
+    fn record() {
+        expect_type("{0, 1}.0", Type::Nat);
+        expect_type("{0, 1}.1", Type::Nat);
+        expect_type("{a=0, b=1}.a", Type::Nat);
+        expect_type("{a=0, b=1}.b", Type::Nat);
+
+        // works for nested records as well
+        expect_type(r"(\x:{Nat, {Nat, Nat}} . x.0) {0, {1, 2}}", Type::Nat);
+        expect_type(r"(\x:{Nat, {Nat, Nat}} . x.1.0) {0, {1, 2}}", Type::Nat);
+        expect_type(r"(\x:{Nat, {Nat, Nat}} . x.1.1) {0, {1, 2}}", Type::Nat);
+
+        // can be mixed record/tuple
+        expect_type(
+            r"(\x:{a:Nat, {b:Nat, c:Nat}} . x.a) {a=0, {b=1, c=2}}",
+            Type::Nat,
+        );
+        expect_type(
+            r"(\x:{a:Nat, {b:Nat, c:Nat}} . x.1.b) {a=0, {b=1, c=2}}",
+            Type::Nat,
+        );
+        expect_type(
+            r"(\x:{a:Nat, {b:Nat, c:Nat}} . x.1.c) {a=0, {b=1, c=2}}",
+            Type::Nat,
+        );
+
+        expect_type(
+            "{1, 2}",
+            Type::Record(vec![("0".into(), Type::Nat), ("1".into(), Type::Nat)]),
+        );
+        expect_type(
+            "{a=1, b=2}",
+            Type::Record(vec![("a".into(), Type::Nat), ("b".into(), Type::Nat)]),
+        );
+    }
+
+    #[test]
     fn condition_non_bool() {
         expect_err("if 1 then true else false", "non-boolean condition");
     }
@@ -154,5 +190,15 @@ mod test {
             "case (<a=0> as <a:Nat, b:Bool>) of <b=b> → 0 | <a=a> → 1",
             "mismatched case variant",
         );
+    }
+
+    #[test]
+    fn invalid_accessor() {
+        expect_err("{a = 1, b = 2}.c", "invalid record accessor");
+    }
+
+    #[test]
+    fn non_record_proj() {
+        expect_err("true.0", "non-record proj");
     }
 }

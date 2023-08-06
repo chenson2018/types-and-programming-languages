@@ -53,4 +53,28 @@ mod test {
             "0",
         );
     }
+
+    #[test]
+    fn record() {
+        expect_lambda("{0, 1}.0", "0");
+        expect_lambda("{0, 1}.1", "1");
+        expect_lambda("{a=0, b=1}.a", "0");
+        expect_lambda("{a=0, b=1}.b", "1");
+
+        // works for nested records as well
+        expect_lambda(r"(\x:{Nat, {Nat, Nat}} . x.0) {0, {1, 2}}", "0");
+        expect_lambda(r"(\x:{Nat, {Nat, Nat}} . x.1.0) {0, {1, 2}}", "1");
+        expect_lambda(r"(\x:{Nat, {Nat, Nat}} . x.1.1) {0, {1, 2}}", "2");
+
+        // can be mixed record/tuple
+        expect_lambda(r"(\x:{a:Nat, {b:Nat, c:Nat}} . x.a) {a=0, {b=1, c=2}}", "0");
+        expect_lambda(
+            r"(\x:{a:Nat, {b:Nat, c:Nat}} . x.1.b) {a=0, {b=1, c=2}}",
+            "1",
+        );
+        expect_lambda(
+            r"(\x:{a:Nat, {b:Nat, c:Nat}} . x.1.c) {a=0, {b=1, c=2}}",
+            "2",
+        );
+    }
 }

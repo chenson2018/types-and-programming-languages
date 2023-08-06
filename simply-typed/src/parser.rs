@@ -114,6 +114,8 @@ impl<'a> Parser<'a> {
                 TokenType::Comma,
                 TokenType::Eof,
                 TokenType::Dot,
+                TokenType::LeftBrace,
+                TokenType::RightBrace,
             ]) {
                 return Err(format!("unexpected {:?} in type", self.peek()));
             };
@@ -128,13 +130,42 @@ impl<'a> Parser<'a> {
                 | TokenType::RightParen
                 | TokenType::Dot
                 | TokenType::Comma
-                | TokenType::Eof => (),
+                | TokenType::Eof
+                | TokenType::RightBrace => (),
                 _ => {
                     self.advance();
                 }
             };
 
             match current {
+                Token {
+                    token: TokenType::LeftBrace,
+                    ..
+                } => {
+                    let mut records = Vec::new();
+                    let mut counter = 0;
+
+                    loop {
+                        let name = if self.check(TokenType::Name) {
+                            let name = self.expect(TokenType::Name)?.name.expect("missing name");
+                            self.expect(TokenType::Colon)?;
+                            name
+                        } else {
+                            counter.to_string()
+                        };
+
+                        records.push((name, self.dtype()?));
+
+                        if self.peek().token == TokenType::RightBrace {
+                            self.advance();
+                            break;
+                        } else {
+                            self.expect(TokenType::Comma)?;
+                            counter += 1;
+                        }
+                    }
+                    types.push(Type::Record(records));
+                }
                 // TODO this might need some work for nested variants
                 Token {
                     token: TokenType::Lt,
@@ -204,13 +235,28 @@ impl<'a> Parser<'a> {
             && !self.check(TokenType::Gt)
             && !self.check(TokenType::Of)
             && !self.check(TokenType::VertBar)
+            && !self.check(TokenType::Comma)
+            && !self.check(TokenType::RightBrace)
+            && !self.check(TokenType::Dot)
         {
             terms.push(self.primary()?);
         }
 
         let head = &terms[0];
         let tail = &terms[1..];
-        Ok(tail.iter().fold(head.clone(), |acc, t| app(acc, t.clone())))
+        let mut term = tail.iter().fold(head.clone(), |acc, t| app(acc, t.clone()));
+
+        // check if we are accessing a record from this term, possibly multiple times
+        while self.check(TokenType::Dot) {
+            self.expect(TokenType::Dot)?;
+            let accessor = self
+                .expect(TokenType::Name)?
+                .name
+                .expect("missing record accessor");
+            term = Term::Proj(box term, accessor);
+        }
+
+        Ok(term)
     }
 
     fn primary(&mut self) -> Result<Term, String> {
@@ -226,6 +272,37 @@ impl<'a> Parser<'a> {
                 self.expect(TokenType::As)?;
                 let dtype = self.dtype()?;
                 Ok(Term::Tag(var_name, box term, dtype))
+            }
+            Token {
+                token: TokenType::LeftBrace,
+                ..
+            } => {
+                let mut records: Vec<(String, Term)> = Vec::new();
+                let mut counter = 0;
+
+                while !self.check(TokenType::RightBrace) {
+                    // encodes tuples as records with a numeric name
+                    let rec_name = if self.check(TokenType::Name) {
+                        let name = self.expect(TokenType::Name)?.name.expect("missing name");
+                        self.expect(TokenType::Equal)?;
+                        name
+                    } else {
+                        counter.to_string()
+                    };
+
+                    let term = self.expr()?;
+
+                    if self.check(TokenType::Comma) {
+                        self.advance();
+                    }
+
+                    records.push((rec_name, term));
+                    counter += 1;
+                }
+
+                self.expect(TokenType::RightBrace)?;
+
+                Ok(Term::Record(records))
             }
             Token {
                 token: TokenType::Case,
@@ -317,7 +394,6 @@ impl<'a> Parser<'a> {
                 let t2 = self.primary()?;
                 Ok(Term::Cons(box t1, box t2))
             }
-            // TODO make this a term instead of a derived form
             Token {
                 token: TokenType::Let,
                 ..
@@ -401,7 +477,7 @@ impl<'a> Parser<'a> {
             } => Ok(term),
             _ => Err(format!(
                 "empty program or primary failure at {:?}",
-                self.peek()
+                self.previous()
             )),
         }
     }

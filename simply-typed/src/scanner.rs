@@ -21,6 +21,8 @@ lazy_static! {
             ('<', TokenType::Lt),
             ('>', TokenType::Gt),
             ('|', TokenType::VertBar),
+            ('{', TokenType::LeftBrace),
+            ('}', TokenType::RightBrace),
         ])
     };
     static ref KEYWORDS: HashMap<&'static str, TokenType> = {
@@ -88,6 +90,10 @@ pub enum TokenType {
     Of,
     VertBar,
     As,
+
+    // for records
+    LeftBrace,
+    RightBrace,
 
     // if expressions
     If,
@@ -231,8 +237,18 @@ impl Scanner {
         while self.peek().is_ascii_digit() {
             self.advance();
         }
-        let nat_term: Term = self.lexeme().parse::<usize>().unwrap().into();
-        self.add_term_token(TokenType::Nat, nat_term);
+
+        // if the last token was Dot, interpret as a tuple accessor (Name)
+        if let Some(&Token {
+            token: TokenType::Dot,
+            ..
+        }) = self.tokens.last()
+        {
+            self.add_name_token(TokenType::Name, self.lexeme());
+        } else {
+            let nat_term: Term = self.lexeme().parse::<usize>().unwrap().into();
+            self.add_term_token(TokenType::Nat, nat_term);
+        }
     }
 
     fn scan_token(&mut self) -> Result<(), String> {

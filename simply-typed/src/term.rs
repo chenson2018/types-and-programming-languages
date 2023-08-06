@@ -31,6 +31,9 @@ pub enum Term {
     // variants
     Tag(String, Box<Term>, Type),
     Case(Box<Term>, Vec<(String, String, Term)>),
+    // records
+    Record(Vec<(String, Term)>),
+    Proj(Box<Term>, String),
     // unit
     Unit,
 }
@@ -63,6 +66,9 @@ pub enum TermAnon {
     // variants
     Tag(String, Box<TermAnon>),
     Case(Box<TermAnon>, Vec<(String, TermAnon)>),
+    // records
+    Record(Vec<(String, TermAnon)>),
+    Proj(Box<TermAnon>, String),
     // unit
     Unit,
 }
@@ -221,6 +227,18 @@ impl Display for TermAnon {
                 Ok(())
             }
             Self::Let(t1, t2) => write!(f, "let {t1};\n{t2}"),
+            Self::Record(records) => {
+                write!(f, "{{")?;
+                let len = records.len();
+                for (i, (rname, term)) in records.iter().enumerate() {
+                    write!(f, "{rname}={term}")?;
+                    if i + 1 < len {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            Self::Proj(t1, access) => write!(f, "{t1}.{access}"),
         }
     }
 }
@@ -290,6 +308,18 @@ impl Display for Term {
                 Ok(())
             }
             Self::Let(binding, t1, t2) => write!(f, "let {binding} = {t1};\n{t2}"),
+            Self::Record(records) => {
+                write!(f, "{{")?;
+                let len = records.len();
+                for (i, (rname, term)) in records.iter().enumerate() {
+                    write!(f, "{rname}={term}")?;
+                    if i + 1 < len {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            Self::Proj(t1, access) => write!(f, "{t1}.{access}"),
         }
     }
 }
@@ -375,6 +405,15 @@ impl TermAnon {
             TermAnon::Let(t1, t2) => {
                 TermAnon::Let(box t1.shift_cutoff(c, d), box t2.shift_cutoff(c + 1, d))
             }
+            TermAnon::Record(records) => TermAnon::Record(
+                records
+                    .iter()
+                    .map(|(rname, term)| (rname.into(), term.shift_cutoff(c, d)))
+                    .collect(),
+            ),
+            TermAnon::Proj(box t1, access) => {
+                TermAnon::Proj(box t1.shift_cutoff(c, d), access.into())
+            }
         }
     }
 
@@ -414,6 +453,13 @@ impl TermAnon {
             TermAnon::Let(t1, t2) => {
                 TermAnon::Let(box t1.sub(j, s), box t2.sub(j + 1, &s.shift(1)))
             }
+            TermAnon::Record(records) => TermAnon::Record(
+                records
+                    .iter()
+                    .map(|(rname, term)| (rname.into(), term.sub(j, s)))
+                    .collect(),
+            ),
+            TermAnon::Proj(box t1, access) => TermAnon::Proj(box t1.sub(j, s), access.into()),
         }
     }
 
@@ -478,6 +524,27 @@ impl TermAnon {
             }
             Self::Tag(vname, t1) => Self::Tag(vname.into(), box t1.full()),
             Self::Let(box t1, box t2) => t2.sub(0, &t1.full()).full(),
+            Self::Record(records) => Self::Record(
+                records
+                    .iter()
+                    .map(|(rname, term)| (rname.clone(), term.full()))
+                    .collect(),
+            ),
+            Self::Proj(box t1, access) => {
+                let t1_eval = t1.full();
+
+                match t1_eval {
+                    TermAnon::Record(records) => {
+                        let (_, term) = records
+                            .iter()
+                            .filter(|(rname, _)| rname == access)
+                            .next()
+                            .unwrap();
+                        term.full()
+                    }
+                    _ => self.clone(),
+                }
+            }
             _ => self.clone(),
         }
     }
@@ -627,6 +694,22 @@ impl Term {
                 let t2_type = t2.dtype_priv(&ctx)?;
                 Ok(t2_type)
             }
+            Self::Record(records) => {
+                let mut record_types: Vec<(String, Type)> = Vec::new();
+                for (rname, term) in records {
+                    record_types.push((rname.clone(), term.dtype_priv(&ctx)?));
+                }
+                Ok(Type::Record(record_types))
+            }
+            Self::Proj(box t1, access) => match t1.dtype_priv(&ctx)? {
+                Type::Record(records) => {
+                    match records.iter().filter(|(rname, _)| rname == access).next() {
+                        Some((_, dtype)) => Ok(dtype.clone()),
+                        None => Err("invalid record accessor"),
+                    }
+                }
+                _ => Err("non-record proj"),
+            },
         }
     }
 
@@ -683,6 +766,14 @@ impl Term {
                 let t2_rem = t2.remove_names(&ctx);
                 TermAnon::Let(box t1_rem, box t2_rem)
             }
+            Term::Record(records) => {
+                let records_anon: Vec<(String, TermAnon)> = records
+                    .iter()
+                    .map(|(rname, term)| (rname.clone(), term.remove_names(ctx)))
+                    .collect();
+                TermAnon::Record(records_anon)
+            }
+            Term::Proj(t1, access) => TermAnon::Proj(box t1.remove_names(ctx), access.into()),
         }
     }
 
@@ -720,7 +811,8 @@ impl Term {
             | Term::IsNil(t1)
             | Term::Head(t1)
             | Term::Tail(t1)
-            | Term::Tag(_, t1, _) => t1.extract_vars(h),
+            | Term::Tag(_, t1, _)
+            | Term::Proj(t1, _) => t1.extract_vars(h),
             Term::Case(t1, cases) => {
                 t1.extract_vars(h);
                 for (_, _, term) in cases {
@@ -728,6 +820,11 @@ impl Term {
                 }
             }
             Term::False | Term::True | Term::Zero | Term::Nil(_) | Term::Unit => (),
+            Self::Record(records) => {
+                for (_, term) in records {
+                    term.extract_vars(h);
+                }
+            }
         }
     }
 

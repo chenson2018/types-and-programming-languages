@@ -20,6 +20,8 @@ pub enum Term {
     IsZero(Box<Term>),
     // fixed point
     Fix(Box<Term>),
+    // let binding
+    Let(String, Box<Term>, Box<Term>),
     // lists
     Nil(Type),
     Cons(Box<Term>, Box<Term>),
@@ -50,6 +52,8 @@ pub enum TermAnon {
     IsZero(Box<TermAnon>),
     // fixed point
     Fix(Box<TermAnon>),
+    // let binding
+    Let(Box<TermAnon>, Box<TermAnon>),
     // lists
     Nil,
     Cons(Box<TermAnon>, Box<TermAnon>),
@@ -216,6 +220,7 @@ impl Display for TermAnon {
 
                 Ok(())
             }
+            Self::Let(t1, t2) => write!(f, "let {t1};\n{t2}"),
         }
     }
 }
@@ -284,6 +289,7 @@ impl Display for Term {
 
                 Ok(())
             }
+            Self::Let(binding, t1, t2) => write!(f, "let {binding} = {t1};\n{t2}"),
         }
     }
 }
@@ -366,6 +372,9 @@ impl TermAnon {
                     .collect();
                 TermAnon::Case(box t1.shift_cutoff(c, d), anon_cases)
             }
+            TermAnon::Let(t1, t2) => {
+                TermAnon::Let(box t1.shift_cutoff(c, d), box t2.shift_cutoff(c + 1, d))
+            }
         }
     }
 
@@ -401,6 +410,9 @@ impl TermAnon {
                     .map(|(vname, term)| (vname.clone(), term.sub(j + 1, &s.shift(1))))
                     .collect();
                 TermAnon::Case(box t1.sub(j, s), anon_cases)
+            }
+            TermAnon::Let(t1, t2) => {
+                TermAnon::Let(box t1.sub(j, s), box t2.sub(j + 1, &s.shift(1)))
             }
         }
     }
@@ -465,6 +477,7 @@ impl TermAnon {
                 }
             }
             Self::Tag(vname, t1) => Self::Tag(vname.into(), box t1.full()),
+            Self::Let(box t1, box t2) => t2.sub(0, &t1.full()).full(),
             _ => self.clone(),
         }
     }
@@ -607,6 +620,13 @@ impl Term {
                     Err("non-tag case")
                 }
             }
+            Self::Let(binding, t1, t2) => {
+                let t1_type = t1.dtype_priv(&ctx)?;
+                let mut ctx = ctx.clone();
+                ctx.insert(binding.into(), t1_type);
+                let t2_type = t2.dtype_priv(&ctx)?;
+                Ok(t2_type)
+            }
         }
     }
 
@@ -656,6 +676,13 @@ impl Term {
                     .collect();
                 TermAnon::Case(box t1.remove_names(ctx), anon_cases)
             }
+            Term::Let(binding, t1, t2) => {
+                let t1_rem = t1.remove_names(ctx);
+                let mut ctx = ctx.clone();
+                ctx.push(binding.into());
+                let t2_rem = t2.remove_names(&ctx);
+                TermAnon::Let(box t1_rem, box t2_rem)
+            }
         }
     }
 
@@ -681,7 +708,7 @@ impl Term {
                 consq.extract_vars(h);
                 alt.extract_vars(h);
             }
-            Term::App(t1, t2) | Term::Cons(t1, t2) => {
+            Term::App(t1, t2) | Term::Cons(t1, t2) | Term::Let(_, t1, t2) => {
                 t1.extract_vars(h);
                 t2.extract_vars(h);
             }

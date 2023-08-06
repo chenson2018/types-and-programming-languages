@@ -9,7 +9,8 @@ mod test {
 
     #[test]
     fn let_binding() {
-        expect_lambda("let x:Nat = 1; x", "1");
+        expect_lambda("let x = 1; x", "1");
+        expect_lambda("let x = 1; let y = succ x; y", "2");
     }
 
     #[test]

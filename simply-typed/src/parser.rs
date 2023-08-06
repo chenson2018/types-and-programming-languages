@@ -323,14 +323,15 @@ impl<'a> Parser<'a> {
                 ..
             } => {
                 let binding = self.expect(TokenType::Name)?;
-                self.expect(TokenType::Colon)?;
-                let dtype = self.dtype()?;
+                //                self.expect(TokenType::Colon)?;
+                //                let dtype = self.dtype()?;
                 self.expect(TokenType::Equal)?;
-                let e1 = self.expr()?;
+                let t1 = self.expr()?;
                 self.expect(TokenType::In)?;
-                let e2 = self.expr()?;
+                let t2 = self.expr()?;
                 if let Some(name) = binding.name {
-                    Ok(app(abs(name, dtype, e2), e1))
+                    Ok(Term::Let(name, box t1, box t2))
+                //                    Ok(app(abs(name, dtype, e2), e1))
                 } else {
                     Err("let missing binding".into())
                 }

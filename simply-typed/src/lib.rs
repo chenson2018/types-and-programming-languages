@@ -3,6 +3,7 @@
 #![feature(let_chains)]
 
 pub mod builtins;
+pub mod error;
 pub mod parser;
 pub mod scanner;
 pub mod term;

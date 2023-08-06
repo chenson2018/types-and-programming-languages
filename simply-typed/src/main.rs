@@ -1,7 +1,9 @@
+use simply_typed::error::LcErrorReporter;
 use simply_typed::parser::Parser;
 use simply_typed::scanner::Scanner;
 
 use clap::Parser as CliParser;
+use main_error::MainError;
 
 use std::path::PathBuf;
 
@@ -25,7 +27,7 @@ pub struct Cli {
     path: PathBuf,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), MainError> {
     let args = Cli::parse();
     let source = std::fs::read_to_string(&args.path)?;
 
@@ -37,22 +39,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut parser = Parser::from(&scanner);
-    let ast = parser.parse(args.std)?;
 
-    if args.ast {
-        println!("AST: \n\n{:#?}\n", ast);
+    match parser.parse(args.std) {
+        Ok(ast) => {
+            if args.ast {
+                println!("AST: \n\n{:#?}\n", ast);
+            }
+
+            println!("Input code:\n\n{}\n", ast);
+
+            if !args.skip_typecheck {
+                let dtype = ast.dtype()?;
+                println!("Type:\n\n{}\n", dtype);
+            }
+
+            if !args.skip_eval {
+                println!("Full Beta Reduction:\n\n{}", ast.full());
+            }
+
+            Ok(())
+        }
+        Err(e) => Err(LcErrorReporter::new(e, args.path, source, "Parser").into()),
     }
-
-    println!("Input code:\n\n{}\n", ast);
-
-    if !args.skip_typecheck {
-        let dtype = ast.dtype()?;
-        println!("Type:\n\n{}\n", dtype);
-    }
-
-    if !args.skip_eval {
-        println!("Full Beta Reduction:\n\n{}", ast.full());
-    }
-
-    Ok(())
 }

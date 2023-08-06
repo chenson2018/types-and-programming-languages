@@ -1,4 +1,5 @@
 use crate::builtins::BUILTINS;
+use crate::error::LcError;
 use crate::scanner::{Scanner, Token, TokenType};
 use crate::term::{abs, app, var, Term};
 use crate::types::Type;
@@ -59,11 +60,13 @@ impl<'a> Parser<'a> {
         self.peek().token == t
     }
 
-    fn expect(&mut self, tt: TokenType) -> Result<Token, String> {
+    fn expect(&mut self, tt: TokenType) -> Result<Token, LcError> {
         if self.check(tt) {
             Ok(self.advance())
         } else {
-            Err(format!("Expected {:?}, got {:?}", tt, self.peek().token))
+            let peek = self.peek();
+            let msg = format!("Expected {:?}, got {:?}", tt, peek.token);
+            Err(LcError::new(&msg, peek.range))
         }
     }
 
@@ -93,7 +96,7 @@ impl<'a> Parser<'a> {
         false
     }
 
-    fn dtype(&mut self) -> Result<Type, String> {
+    fn dtype(&mut self) -> Result<Type, LcError> {
         let mut types: Vec<Type> = Vec::new();
 
         loop {
@@ -117,7 +120,9 @@ impl<'a> Parser<'a> {
                 TokenType::LeftBrace,
                 TokenType::RightBrace,
             ]) {
-                return Err(format!("unexpected {:?} in type", self.peek()));
+                let peek = self.peek();
+                let msg = format!("unexpected {:?} in type", peek.token);
+                return Err(LcError::new(&msg, peek.range));
             };
 
             let current = self.peek();
@@ -220,7 +225,7 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    pub fn parse(&mut self, std: bool) -> Result<Term, String> {
+    pub fn parse(&mut self, std: bool) -> Result<Term, LcError> {
         let mut term = self.expr()?;
 
         if std {
@@ -232,7 +237,7 @@ impl<'a> Parser<'a> {
         Ok(term)
     }
 
-    pub fn expr(&mut self) -> Result<Term, String> {
+    pub fn expr(&mut self) -> Result<Term, LcError> {
         let mut terms: Vec<Term> = Vec::new();
 
         while !self.is_end()
@@ -267,7 +272,7 @@ impl<'a> Parser<'a> {
         Ok(term)
     }
 
-    fn primary(&mut self) -> Result<Term, String> {
+    fn primary(&mut self) -> Result<Term, LcError> {
         match self.advance() {
             Token {
                 token: TokenType::Lt,
@@ -406,33 +411,22 @@ impl<'a> Parser<'a> {
                 token: TokenType::Let,
                 ..
             } => {
-                let binding = self.expect(TokenType::Name)?;
-                //                self.expect(TokenType::Colon)?;
-                //                let dtype = self.dtype()?;
+                let name = self.expect(TokenType::Name)?.name.expect("missing name");
                 self.expect(TokenType::Equal)?;
                 let t1 = self.expr()?;
                 self.expect(TokenType::In)?;
                 let t2 = self.expr()?;
-                if let Some(name) = binding.name {
-                    Ok(Term::Let(name, box t1, box t2))
-                //                    Ok(app(abs(name, dtype, e2), e1))
-                } else {
-                    Err("let missing binding".into())
-                }
+                Ok(Term::Let(name, box t1, box t2))
             }
             Token {
                 token: TokenType::Lambda,
                 ..
             } => {
-                let binding = self.expect(TokenType::Name)?;
+                let name = self.expect(TokenType::Name)?.name.expect("missing name");
                 self.expect(TokenType::Colon)?;
                 let dtype = self.dtype()?;
                 self.expect(TokenType::Dot)?;
-                if let Some(name) = binding.name {
-                    Ok(abs(&name, dtype, self.expr()?))
-                } else {
-                    Err("lambda missing binding".into())
-                }
+                Ok(abs(&name, dtype, self.expr()?))
             }
             Token {
                 token: TokenType::If,
@@ -477,10 +471,7 @@ impl<'a> Parser<'a> {
             Token {
                 term: Some(term), ..
             } => Ok(term),
-            _ => Err(format!(
-                "empty program or primary failure at {:?}",
-                self.previous()
-            )),
+            _ => Err(LcError::new(&"invalid expression", self.previous().range)),
         }
     }
 }

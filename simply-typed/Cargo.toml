@@ -16,3 +16,5 @@ path = "src/main.rs"
 [dependencies]
 lazy_static = "1.4.0"
 clap = { version = "4.3.10", features = ["derive"] }
+annotate-snippets = "0.9.1"
+main_error = "0.1.2"

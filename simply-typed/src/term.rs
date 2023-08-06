@@ -1,3 +1,4 @@
+use crate::error::LcError;
 use crate::types::Type;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
@@ -157,7 +158,7 @@ impl FromStr for Term {
         let mut parser = crate::parser::Parser::from(&scanner);
 
         match parser.parse(true) {
-            Err(e) => Err(e.to_string()),
+            Err(LcError { label, .. }) => Err(label.to_string()),
             Ok(ast) => Ok(ast),
         }
     }

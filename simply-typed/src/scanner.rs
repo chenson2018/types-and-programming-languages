@@ -132,6 +132,7 @@ pub struct Token {
     pub(crate) term: Option<Term>,
     pub(crate) dtype: Option<Type>,
     pub(crate) name: Option<String>,
+    pub(crate) range: (usize, usize),
 }
 
 pub struct Scanner {
@@ -178,6 +179,7 @@ impl Scanner {
             term: None,
             dtype: None,
             name: None,
+            range: (self.start, self.current),
         });
     }
 
@@ -187,6 +189,7 @@ impl Scanner {
             term: Some(term),
             dtype: None,
             name: None,
+            range: (self.start, self.current),
         });
     }
 
@@ -196,6 +199,7 @@ impl Scanner {
             term: None,
             dtype: Some(dtype),
             name: None,
+            range: (self.start, self.current),
         });
     }
 
@@ -205,6 +209,7 @@ impl Scanner {
             term: None,
             dtype: None,
             name: Some(name),
+            range: (self.start, self.current),
         });
     }
 

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::builtins::BUILTINS;
 use crate::error::LcError;
 use crate::scanner::{Scanner, Token, TokenType};
@@ -8,6 +10,7 @@ use crate::types::Type;
 pub struct Parser<'a> {
     current: usize,
     tokens: &'a Vec<Token>,
+    type_bindings: HashMap<String, Type>,
 }
 
 impl<'a> From<&'a Scanner> for Parser<'a> {
@@ -19,7 +22,11 @@ impl<'a> From<&'a Scanner> for Parser<'a> {
 
 impl<'a> Parser<'a> {
     fn new(tokens: &'a Vec<Token>) -> Self {
-        Self { current: 0, tokens }
+        Self {
+            current: 0,
+            tokens,
+            type_bindings: HashMap::new(),
+        }
     }
 
     fn peek(&self) -> Token {
@@ -119,6 +126,8 @@ impl<'a> Parser<'a> {
                 TokenType::Dot,
                 TokenType::LeftBrace,
                 TokenType::RightBrace,
+                TokenType::Name,
+                TokenType::In,
             ]) {
                 let peek = self.peek();
                 let msg = format!("unexpected {:?} in type", peek.token);
@@ -136,13 +145,26 @@ impl<'a> Parser<'a> {
                 | TokenType::Dot
                 | TokenType::Comma
                 | TokenType::Eof
-                | TokenType::RightBrace => (),
+                | TokenType::RightBrace
+                | TokenType::In => (),
                 _ => {
                     self.advance();
                 }
             };
 
             match current {
+                Token {
+                    token: TokenType::Name,
+                    name: Some(name),
+                    range,
+                    ..
+                } => {
+                    if let Some(dtype) = self.type_bindings.get(&name) {
+                        types.push(dtype.clone());
+                    } else {
+                        return Err(LcError::new(&"undefined name in type", range));
+                    }
+                }
                 Token {
                     token: TokenType::LeftBrace,
                     ..
@@ -509,7 +531,18 @@ impl<'a> Parser<'a> {
                 token: TokenType::Name,
                 name: Some(name),
                 ..
-            } => Ok(var(name, self.previous().range)),
+            } => {
+                if self.check(TokenType::Equal) {
+                    // parser-level type alias
+                    self.expect(TokenType::Equal)?;
+                    let dtype = self.dtype()?;
+                    self.expect(TokenType::In)?;
+                    self.type_bindings.insert(name, dtype);
+                    self.primary()
+                } else {
+                    Ok(var(name, self.previous().range))
+                }
+            }
             Token {
                 term: Some(term), ..
             } => Ok(term),

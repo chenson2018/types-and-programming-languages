@@ -92,23 +92,7 @@ impl TryFrom<&Term> for usize {
     type Error = &'static str;
 
     fn try_from(t: &Term) -> Result<Self, Self::Error> {
-        match t {
-            Term::Succ(..) => {
-                let mut term = t.clone();
-                let mut count = 0;
-
-                while !matches!(term, Term::Zero) {
-                    term = match term {
-                        Term::Succ(t, _) => *t,
-                        _ => return Err("nan"),
-                    };
-                    count += 1;
-                }
-                Ok(count)
-            }
-            Term::Zero => Ok(0),
-            _ => Err("nan"),
-        }
+        (&t.to_anon()).try_into()
     }
 }
 

@@ -309,7 +309,6 @@ pub fn var<T>(name: T, loc: Loc) -> Term
 where
     T: Into<String>,
 {
-    // TODO
     Term::Var(name.into(), loc)
 }
 
@@ -317,7 +316,6 @@ pub fn var_no_loc<T>(name: T) -> Term
 where
     T: Into<String>,
 {
-    // TODO
     Term::Var(name.into(), (0, 0))
 }
 

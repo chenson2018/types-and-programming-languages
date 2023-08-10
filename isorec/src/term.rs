@@ -467,7 +467,6 @@ impl TermAnon {
                     partial
                 }
             }
-            Self::Abs(t1) => absa(t1.full()),
             Self::If(cond, consq, alt) => {
                 let eval_cond = cond.full();
                 match eval_cond {

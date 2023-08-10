@@ -76,7 +76,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(dead_code)]
     fn match_any<T>(&mut self, types: T) -> bool
     where
         T: IntoIterator<Item = TokenType>,
@@ -287,8 +286,7 @@ impl<'a> Parser<'a> {
             .fold(head.clone(), |acc, t| app(acc, t.clone(), (left, right)));
 
         // check if we are accessing a record from this term, possibly multiple times
-        while self.check(TokenType::Dot) {
-            self.expect(TokenType::Dot)?;
+        while self.match_any([TokenType::Dot]) {
             let accessor = self
                 .expect(TokenType::Name)?
                 .name
@@ -355,11 +353,7 @@ impl<'a> Parser<'a> {
                     };
 
                     let term = self.expr()?;
-
-                    if self.check(TokenType::Comma) {
-                        self.advance();
-                    }
-
+                    self.match_any([TokenType::Comma]);
                     records.push((rec_name, term));
                     counter += 1;
                 }
@@ -379,8 +373,7 @@ impl<'a> Parser<'a> {
                 self.expect(TokenType::Of)?;
                 let mut cases: Vec<(String, String, Term)> = Vec::new();
 
-                while self.check(TokenType::Lt) {
-                    self.expect(TokenType::Lt)?;
+                while self.match_any([TokenType::Lt]) {
                     let var_name = self.expect(TokenType::Name)?.name.expect("missing name");
                     self.expect(TokenType::Equal)?;
                     let binding = self.expect(TokenType::Name)?.name.expect("missing name");
@@ -389,9 +382,7 @@ impl<'a> Parser<'a> {
                     let term = self.expr()?;
                     cases.push((var_name, binding, term));
 
-                    if self.check(TokenType::VertBar) {
-                        self.advance();
-                    } else {
+                    if !self.match_any([TokenType::VertBar]) {
                         break;
                     }
                 }
@@ -469,9 +460,8 @@ impl<'a> Parser<'a> {
                 name: Some(name),
                 ..
             } => {
-                if self.check(TokenType::Equal) {
+                if self.match_any([TokenType::Equal]) {
                     // parser-level type alias
-                    self.expect(TokenType::Equal)?;
                     let dtype = self.dtype()?;
                     self.expect(TokenType::In)?;
                     self.type_bindings.insert(name, dtype);

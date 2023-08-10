@@ -254,7 +254,12 @@ impl<'a> Parser<'a> {
 
     pub fn parse(&mut self) -> Result<Term, LcError> {
         let term = self.expr()?;
-        Ok(term)
+        if self.is_end() {
+            Ok(term)
+        } else {
+            let range = self.peek().range;
+            Err(LcError::new(&"unterminated/invalid expression", range))
+        }
     }
 
     pub fn expr(&mut self) -> Result<Term, LcError> {

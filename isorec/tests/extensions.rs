@@ -15,8 +15,8 @@ mod test {
 
     #[test]
     fn isnil() {
-        expect_lambda("isnil nil)", "true");
-        expect_lambda("isnil (cons 1 (cons 2 (cons 3 nil))))", "false");
+        expect_lambda("isnil nil", "true");
+        expect_lambda("isnil (cons 1 (cons 2 (cons 3 nil)))", "false");
     }
 
     #[test]
